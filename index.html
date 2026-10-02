@@ -1,0 +1,3001 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CAIN — Fichas de Exorcista</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:          #14110F;
+    --bg-raised:   #1B1714;
+    --line:        #33291F;
+    --bone:        #E7DFCF;
+    --bone-dim:    #A79C89;
+    --blood:       #8C2A22;
+    --blood-bright:#C6401F;
+    --gold:        #AE8A4E;
+    --font-display: 'Cinzel', serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  *{ box-sizing:border-box; }
+
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:var(--bg);
+    color:var(--bone);
+    font-family:var(--font-body);
+  }
+
+  /* textura sutil de ruído/pergaminho manchado, no lugar de um fundo liso */
+  body{
+    background-image:
+      radial-gradient(circle at 15% 10%, rgba(140,42,34,0.08), transparent 40%),
+      radial-gradient(circle at 85% 90%, rgba(174,138,78,0.06), transparent 45%);
+  }
+
+  header{
+    display:flex; align-items:baseline; justify-content:space-between;
+    padding:22px clamp(16px,4vw,48px);
+    border-bottom:1px solid var(--line);
+  }
+
+  header h1{
+    font-family:var(--font-display);
+    font-weight:700;
+    letter-spacing:0.04em;
+    font-size:1.5rem;
+    margin:0;
+    color:var(--bone);
+  }
+  header h1 span{ color:var(--blood-bright); }
+
+  header .subtitle{
+    font-family:var(--font-mono);
+    font-size:0.75rem;
+    color:var(--bone-dim);
+  }
+
+  main{
+    display:grid;
+    grid-template-columns: minmax(280px, 1fr) minmax(360px, 1.4fr);
+    gap:1px;
+    background:var(--line);
+    min-height:calc(100vh - 78px);
+  }
+
+  @media (max-width: 860px){
+    main{ grid-template-columns: 1fr; }
+  }
+
+  section{
+    background:var(--bg);
+    padding:clamp(18px,3vw,32px);
+    overflow-y:auto;
+  }
+
+  .panel-label{
+    font-family:var(--font-mono);
+    font-size:0.7rem;
+    letter-spacing:0.08em;
+    color:var(--gold);
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:18px;
+  }
+  .panel-label::after{
+    content:"";
+    flex:1;
+    height:1px;
+    background:var(--line);
+  }
+
+  /* ---------- Área de Jogo ---------- */
+  #area-jogo{
+    display:flex;
+    flex-direction:column;
+  }
+  #area-jogo .tab-panel{
+    flex:1;
+    min-height:0;
+  }
+  #area-jogo .tab-panel.active{
+    display:flex;
+    flex-direction:column;
+  }
+  #area-jogo h2{
+    font-family:var(--font-display);
+    font-size:1.15rem;
+    font-weight:600;
+    margin:0 0 6px;
+  }
+  #area-jogo p.hint{
+    color:var(--bone-dim);
+    font-size:0.9rem;
+    line-height:1.5;
+    max-width:46ch;
+  }
+
+  .log-entry{
+    border-left:2px solid var(--line);
+    padding:10px 0 10px 14px;
+    margin-top:14px;
+    font-size:0.9rem;
+    color:var(--bone-dim);
+  }
+
+  #whiteboard-frame{
+    width:100%;
+    flex:1;
+    min-height:480px;
+    margin-top:18px;
+    background:var(--bg-raised);
+    border:1px solid var(--line);
+    border-radius:2px;
+  }
+
+  /* ---------- Ficha ---------- */
+  #ficha .char-select{
+    display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;
+  }
+  select, button{
+    background:var(--bg-raised);
+    color:var(--bone);
+    border:1px solid var(--line);
+    font-family:var(--font-body);
+    font-size:0.85rem;
+    padding:8px 12px;
+    border-radius:2px;
+  }
+  button{
+    cursor:pointer;
+    border-color:var(--blood);
+    color:var(--bone);
+  }
+  button:hover{ background:var(--blood); }
+
+  .sheet-card{
+    background:var(--bg-raised);
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:20px;
+  }
+  .sheet-card h2{
+    font-family:var(--font-display);
+    margin:0 0 4px;
+    font-size:1.3rem;
+  }
+  .sheet-card .agenda-blasphemy{
+    display:flex; gap:8px; margin:10px 0 18px; flex-wrap:wrap;
+  }
+
+  .tag{
+    font-family:var(--font-mono);
+    font-size:0.7rem;
+    letter-spacing:0.04em;
+    padding:4px 10px;
+    border-radius:20px;
+    border:1px solid var(--line);
+    color:var(--bone-dim);
+  }
+  .tag.blasphemy{
+    color:#fff;
+    border-color:transparent;
+  }
+
+  .abilities-list{
+    list-style:none; margin:0; padding:0;
+  }
+  .abilities-list li{
+    padding:12px 0;
+    border-top:1px solid var(--line);
+  }
+  .abilities-list li:first-child{ border-top:none; }
+  .abilities-list .ability-name{
+    font-weight:600;
+    font-size:0.92rem;
+    margin-bottom:3px;
+  }
+  .abilities-list .ability-text{
+    font-size:0.85rem;
+    color:var(--bone-dim);
+    line-height:1.5;
+  }
+
+  .empty-state{
+    color:var(--bone-dim);
+    font-size:0.9rem;
+    line-height:1.6;
+    max-width:44ch;
+  }
+
+  .status{
+    font-family:var(--font-mono);
+    font-size:0.75rem;
+    color:var(--gold);
+    margin-top:14px;
+  }
+  .status.error{ color:var(--blood-bright); }
+
+  /* ---------- Vida / Psyche Burst / Sin ---------- */
+  .vitals-card{ margin-bottom:20px; }
+
+  .character-header{
+    display:flex;
+    align-items:flex-start;
+    gap:16px;
+    margin-bottom:20px;
+  }
+  .portrait-placeholder{
+    width:120px; height:120px;
+    flex-shrink:0;
+    border:1px solid var(--line);
+    border-radius:3px;
+    background:var(--bg);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    color:var(--bone-dim);
+    overflow:hidden;
+    cursor:pointer;
+    transition:border-color .15s;
+  }
+  .portrait-placeholder:hover{ border-color:var(--gold); }
+  .portrait-placeholder svg{
+    width:34px; height:34px;
+    opacity:0.5;
+  }
+  .portrait-placeholder span{
+    font-family:var(--font-mono);
+    font-size:0.65rem;
+    letter-spacing:0.03em;
+  }
+  .portrait-placeholder img{
+    width:100%; height:100%;
+    object-fit:cover;
+  }
+  .character-fields{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    flex:1;
+    min-width:0;
+    justify-content:center;
+    height:120px;
+  }
+  .character-fields label{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    font-family:var(--font-mono);
+    font-size:0.68rem;
+    color:var(--bone-dim);
+  }
+  .character-fields input[type="text"]{
+    width:100%;
+    background:var(--bg);
+    border:1px solid var(--line);
+    color:var(--bone);
+    font-family:var(--font-body);
+    font-size:0.95rem;
+    padding:7px 10px;
+    border-radius:2px;
+  }
+  .character-fields input[type="text"]:focus{ outline:1px solid var(--gold); }
+  .character-fields input[type="number"]{ width:64px; }
+
+  .vitals-group{ margin-bottom:22px; }
+  .vitals-group:last-child{ margin-bottom:0; }
+
+  .vitals-group-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .vitals-group-header .name{
+    font-weight:600;
+    font-size:0.92rem;
+  }
+
+  .vitals-inputs{ display:flex; gap:14px; }
+  .vitals-inputs label{
+    display:flex; flex-direction:column; gap:4px;
+    font-family:var(--font-mono);
+    font-size:0.68rem;
+    color:var(--bone-dim);
+  }
+  input[type="number"]{
+    width:52px;
+    background:var(--bg);
+    border:1px solid var(--line);
+    color:var(--bone);
+    font-family:var(--font-mono);
+    font-size:0.85rem;
+    padding:5px 6px;
+    border-radius:2px;
+  }
+  input[type="number"]:focus{ outline:1px solid var(--gold); }
+
+  .pip-track{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin:10px 0 4px;
+  }
+  .pip{
+    width:20px; height:20px;
+    border-radius:50%;
+    border:2px solid var(--line);
+    background:transparent;
+    padding:0;
+    cursor:pointer;
+    transition:background .12s, border-color .12s, transform .08s;
+  }
+  .pip:hover{ transform:scale(1.12); border-color:var(--gold); }
+
+  .pip.stress.filled{ background:var(--blood); border-color:var(--blood-bright); }
+  .pip.injury.filled{ background:#2A0E0B; border-color:var(--blood-bright); }
+  .pip.psyche.filled{ background:#2E5B78; border-color:#57A2CC; }
+  .pip.sin.filled{ background:#6D28D9; border-color:#9333EA; }
+  .pip.pericia.filled{ background:var(--gold); border-color:#C9A968; }
+  .pip.talisman.filled{ background:var(--gold); border-color:#C9A968; }
+  .pip.kp.filled{ background:#fff; border-color:#fff; }
+  .pip.avanco.filled{ background:var(--bone); border-color:#fff; }
+  .pip.xp.filled{ background:#2F7A4F; border-color:#4FAE72; }
+
+  .pip.static{ cursor:default; }
+  .pip.static:hover{ transform:none; border-color:var(--line); }
+
+  .question-row{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    padding:10px 0;
+    border-bottom:1px solid var(--line);
+    font-size:0.9rem;
+    line-height:1.4;
+  }
+  .question-row:last-child{ border-bottom:none; }
+  .question-row input[type="checkbox"]{
+    margin-top:3px;
+    width:16px; height:16px;
+    accent-color:var(--gold);
+    flex-shrink:0;
+    cursor:pointer;
+  }
+  .question-row label{ cursor:pointer; }
+
+  .pericia-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    padding:11px 0;
+    border-bottom:1px solid var(--line);
+  }
+  .pericia-row:last-child{ border-bottom:none; }
+  .pericia-name{
+    font-size:0.92rem;
+    font-weight:600;
+  }
+  .pericia-row .pip-track{ margin:0; }
+
+  .bar-track{
+    height:7px;
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:4px;
+    overflow:hidden;
+    margin-top:6px;
+  }
+  .bar-fill{
+    height:100%;
+    width:0%;
+    background:linear-gradient(90deg,#5B21B6,#9333EA);
+    transition:width .18s ease;
+  }
+
+  .damage-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:12px;
+  }
+  .damage-row input[type="number"]{ width:70px; }
+
+  .overflow-btn{
+    display:block;
+    margin-top:12px;
+    width:100%;
+    background:transparent;
+    border:1px solid #9333EA;
+    color:#C89AF5;
+    font-family:var(--font-mono);
+    font-size:0.78rem;
+    letter-spacing:0.03em;
+    padding:9px 12px;
+    border-radius:2px;
+  }
+  .overflow-btn:hover{ background:rgba(147,51,234,0.15); }
+  .overflow-btn.hidden{ display:none; }
+  .overflow-btn.active{
+    animation: sin-overflow-pulse-solid 1s ease-in-out infinite;
+    border-color:#C89AF5;
+    color:#fff;
+  }
+
+  .bar-track.overflow-active .bar-fill{
+    animation: sin-overflow-pulse-gradient 1s ease-in-out infinite;
+  }
+  #sin-pips.overflow-active .pip.filled{
+    animation: sin-overflow-pulse-solid 1s ease-in-out infinite;
+  }
+
+  @keyframes sin-overflow-pulse-gradient{
+    0%, 100% { background: linear-gradient(90deg,#5B21B6,#9333EA); }
+    50%      { background: #0A0808; }
+  }
+  @keyframes sin-overflow-pulse-solid{
+    0%, 100% { background:#6D28D9; border-color:#9333EA; }
+    50%      { background:#0A0808; border-color:#2A1240; }
+  }
+  @keyframes sin-overflow-pulse-border{
+    0%, 100% { border-left-color:#9333EA; }
+    50%      { border-left-color:#0A0808; }
+  }
+
+  .hidden{ display:none !important; }
+
+  .sinmark-card{
+    margin-top:16px;
+    border-left:4px solid #9333EA;
+  }
+  .sinmark-card.overflow-active{
+    animation: sin-overflow-pulse-border 1s ease-in-out infinite;
+  }
+
+  /* ---------- Pathos (cinza até completar, branco ao completar) ---------- */
+  .pip.agony.filled{ background:#7A7468; border-color:#948C7E; }
+  #agony-pips.complete .pip.agony.filled{ background:#fff; border-color:#fff; }
+
+  #agony-bar-fill{ background:#7A7468; }
+  #agony-bar-track.complete .bar-fill{ background:#fff; }
+
+  .overflow-btn.agony{
+    border-color:#7A7468;
+    color:#B8B2A6;
+  }
+  .overflow-btn.agony:hover{ background:rgba(255,255,255,0.08); }
+  .overflow-btn.agony.full{
+    border-color:#fff;
+    color:#fff;
+  }
+
+  /* ---------- Campos de texto genéricos ---------- */
+  .field-input{
+    width:100%;
+    background:var(--bg);
+    border:1px solid var(--line);
+    color:var(--bone);
+    font-family:var(--font-body);
+    font-size:0.92rem;
+    padding:8px 10px;
+    border-radius:2px;
+  }
+  .field-input:focus{ outline:1px solid var(--gold); }
+
+  .big-textarea{
+    width:100%;
+    min-height:140px;
+    margin-top:10px;
+    background:var(--bg);
+    border:1px solid var(--line);
+    color:var(--bone);
+    font-family:var(--font-body);
+    font-size:0.9rem;
+    padding:12px;
+    border-radius:2px;
+    resize:vertical;
+  }
+  .big-textarea:focus{ outline:1px solid var(--gold); }
+
+  /* ---------- Ganchos ---------- */
+  .hook-form{
+    display:flex;
+    align-items:flex-end;
+    gap:8px;
+    margin:10px 0 16px;
+    flex-wrap:wrap;
+  }
+  .hook-form input[type="text"]{ flex:1; min-width:160px; }
+  .hook-form input[type="number"]{ width:60px; }
+  .hook-form-label{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    font-family:var(--font-mono);
+    font-size:0.68rem;
+    color:var(--bone-dim);
+  }
+  .hook-form-label input[type="number"]{ width:60px; }
+
+  .hook-entry{
+    padding:14px 0;
+    border-top:1px solid var(--line);
+  }
+  .hook-entry:first-child{ border-top:none; padding-top:0; }
+  .hook-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:10px;
+  }
+  .hook-title{
+    font-weight:600;
+    font-size:0.9rem;
+  }
+
+  .pip.square{ border-radius:3px; }
+  .pip.hook.filled{ background:#fff; border-color:#fff; }
+
+  @keyframes hook-pulse-solid{
+    0%, 100% { background:#fff; border-color:#fff; }
+    50%      { background:var(--blood); border-color:var(--blood-bright); }
+  }
+  @keyframes hook-pulse-btn{
+    0%, 100% { background:#fff; border-color:#fff; color:#000; }
+    50%      { background:var(--blood); border-color:var(--blood-bright); color:#fff; }
+  }
+  .hook-squares.hook-complete .pip.filled{
+    animation: hook-pulse-solid 1s ease-in-out infinite;
+  }
+  .hook-bar-track.hook-complete .bar-fill{
+    animation: hook-pulse-solid 1s ease-in-out infinite;
+  }
+
+  .resolve-btn{
+    display:block;
+    width:100%;
+    margin-top:10px;
+    background:transparent;
+    border:1px solid var(--blood-bright);
+    color:#fff;
+    font-family:var(--font-mono);
+    font-size:0.78rem;
+    letter-spacing:0.03em;
+    padding:9px 12px;
+    border-radius:2px;
+    animation: hook-pulse-btn 1s ease-in-out infinite;
+  }
+
+  .vitals-note{
+    font-family:var(--font-mono);
+    font-size:0.72rem;
+    color:var(--blood-bright);
+    margin-top:8px;
+    min-height:1em;
+  }
+
+  /* ---------- Abas ---------- */
+  .tab-bar{
+    display:flex;
+    gap:22px;
+    border-bottom:1px solid var(--line);
+    margin-bottom:20px;
+  }
+  .tab-btn{
+    background:transparent;
+    border:none;
+    border-bottom:2px solid transparent;
+    color:var(--bone-dim);
+    font-family:var(--font-display);
+    font-size:1rem;
+    font-weight:600;
+    padding:6px 2px 10px;
+    border-radius:0;
+    cursor:pointer;
+  }
+  .tab-btn:hover{ background:transparent; color:var(--bone); }
+  .tab-btn.active{
+    color:var(--bone);
+    border-bottom-color:var(--blood-bright);
+  }
+  .tab-panel{ display:none; }
+  .tab-panel.active{ display:block; }
+
+  /* ---------- Sub-abas (dentro de Índice) ---------- */
+  .subtab-bar{
+    display:flex;
+    gap:16px;
+    border-bottom:1px solid var(--line);
+    margin-bottom:4px;
+  }
+  .subtab-btn{
+    background:transparent;
+    border:none;
+    border-bottom:2px solid transparent;
+    color:var(--bone-dim);
+    font-family:var(--font-mono);
+    font-size:0.78rem;
+    letter-spacing:0.03em;
+    padding:6px 2px 10px;
+    border-radius:0;
+    cursor:pointer;
+  }
+  .subtab-btn:hover{ background:transparent; color:var(--bone); }
+  .subtab-btn.active{
+    color:var(--bone);
+    border-bottom-color:var(--gold);
+  }
+  .subtab-panel{ display:none; }
+  .subtab-panel.active{ display:block; }
+
+  .index-group{
+    margin-bottom:20px;
+    padding-bottom:16px;
+    border-bottom:1px solid var(--line);
+  }
+  .index-group:last-child{ border-bottom:none; }
+  .index-group-name{
+    font-family:var(--font-display);
+    font-weight:600;
+    font-size:1rem;
+    margin-bottom:8px;
+  }
+
+  /* ---------- Habilidades ---------- */
+  .blasphemy-header{
+    display:flex;
+    gap:16px;
+    align-items:flex-start;
+    padding:16px;
+    margin-bottom:16px;
+    background:var(--bg-raised);
+    border:1px solid var(--line);
+    border-left:4px solid var(--line);
+    border-radius:3px;
+  }
+  .blasphemy-header img{
+    width:90px;
+    height:auto;
+    max-height:140px;
+    object-fit:contain;
+    flex-shrink:0;
+    border-radius:3px;
+  }
+  .blasphemy-header-text{ flex:1; min-width:0; }
+  .blasphemy-header-name{
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:1.1rem;
+    margin-bottom:6px;
+  }
+  .blasphemy-passive-label{
+    font-family:var(--font-mono);
+    font-size:0.7rem;
+    color:var(--gold);
+    letter-spacing:0.03em;
+    margin-bottom:4px;
+  }
+  .blasphemy-passive-desc{
+    font-size:0.85rem;
+    color:var(--bone-dim);
+    line-height:1.5;
+    white-space:pre-line;
+  }
+
+  .ability-entry{
+    padding-bottom:16px;
+    margin-bottom:16px;
+    border-bottom:1px solid var(--line);
+  }
+  .ability-entry:last-child{
+    border-bottom:none;
+    margin-bottom:0;
+    padding-bottom:0;
+  }
+  .ability-row{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    flex-wrap:wrap;
+  }
+  .ability-row select{
+    flex:1 1 160px;
+    min-width:0;
+  }
+  .delete-row-btn{
+    flex-shrink:0;
+    width:34px; height:34px;
+    padding:0;
+    background:transparent;
+    border:1px solid var(--line);
+    color:var(--bone-dim);
+    line-height:1;
+  }
+  .delete-row-btn:hover{
+    background:transparent;
+    border-color:var(--blood-bright);
+    color:var(--blood-bright);
+  }
+  .ability-detail{
+    font-size:0.85rem;
+    color:var(--bone-dim);
+    line-height:1.5;
+    margin-top:10px;
+  }
+  .ability-detail .ability-detail-name{
+    color:var(--bone);
+    font-weight:600;
+    margin-bottom:3px;
+  }
+
+  .agenda-summary-block{ margin-bottom:16px; }
+  .agenda-summary-block:last-child{ margin-bottom:0; }
+  .agenda-summary-label{
+    font-family:var(--font-mono);
+    font-size:0.7rem;
+    letter-spacing:0.04em;
+    color:var(--gold);
+    margin-bottom:8px;
+  }
+  .agenda-summary-items{
+    list-style:none; margin:0; padding:0;
+    font-size:0.88rem;
+    line-height:1.6;
+  }
+  .agenda-summary-tag{
+    color:var(--bone-dim);
+    font-size:0.78rem;
+  }
+
+  .extra-bold-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    padding:4px 0;
+  }
+  .extra-bold-item .delete-row-btn{
+    width:24px; height:24px;
+    font-size:0.85rem;
+    flex-shrink:0;
+  }
+
+  .store-grid{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap:14px;
+  }
+  @media (max-width: 600px){
+    .store-grid{ grid-template-columns: 1fr; }
+  }
+  .store-card{
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-left:4px solid var(--line);
+    border-radius:3px;
+    padding:16px;
+    display:flex;
+    flex-direction:column;
+  }
+  .store-card.cat-aesthetics{ border-left-color:#B5657A; }
+  .store-card.cat-aesthetics .store-card-category{ color:#C98098; }
+  .store-card.cat-possessions{ border-left-color:#2E8A9A; }
+  .store-card.cat-possessions .store-card-category{ color:#4FAEC0; }
+  .store-card.cat-comfort{ border-left-color:var(--gold); }
+  .store-card.cat-comfort .store-card-category{ color:var(--gold); }
+  .store-card.cat-occult{ border-left-color:#7C3AED; }
+  .store-card.cat-occult .store-card-category{ color:#A575F0; }
+
+  .store-card-category{
+    font-family:var(--font-mono);
+    font-size:0.68rem;
+    letter-spacing:0.03em;
+    color:var(--gold);
+    margin-bottom:6px;
+  }
+  .store-card-name{
+    font-weight:600;
+    font-size:0.95rem;
+    margin-bottom:6px;
+  }
+  .store-card-desc{
+    font-size:0.85rem;
+    color:var(--bone-dim);
+    line-height:1.5;
+    flex:1;
+    margin-bottom:12px;
+  }
+  .store-card-meta{
+    font-family:var(--font-mono);
+    font-size:0.75rem;
+    color:var(--bone-dim);
+    margin-bottom:12px;
+  }
+  .store-card button{
+    margin-top:auto;
+  }
+  .store-card button:disabled{
+    opacity:0.5;
+    cursor:default;
+  }
+  .store-card button:disabled:hover{
+    background:var(--bg-raised);
+  }
+
+  .store-scripts-overlay{
+    position:sticky;
+    top:0;
+    z-index:5;
+    display:inline-block;
+    background:var(--bg-raised);
+    border:1px solid var(--gold);
+    color:var(--gold);
+    font-family:var(--font-mono);
+    font-size:0.85rem;
+    padding:8px 16px;
+    border-radius:20px;
+    margin-bottom:16px;
+  }
+
+  .livesheet-card{
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:16px;
+  }
+  .livesheet-name{
+    font-weight:600;
+    font-size:0.95rem;
+    margin-bottom:10px;
+  }
+  .livesheet-stat{
+    display:flex;
+    justify-content:space-between;
+    font-size:0.85rem;
+    color:var(--bone-dim);
+    padding:4px 0;
+    border-top:1px solid var(--line);
+  }
+  .livesheet-stat:first-of-type{ border-top:none; }
+  .livesheet-stat span{ color:var(--bone); font-family:var(--font-mono); }
+  .livesheet-updated{
+    font-family:var(--font-mono);
+    font-size:0.68rem;
+    color:var(--bone-dim);
+    margin-top:10px;
+  }
+
+  .danger-zone{
+    padding:28px clamp(16px,4vw,48px) 44px;
+    display:flex;
+    justify-content:center;
+    border-top:1px solid var(--line);
+    margin-top:20px;
+  }
+  .danger-btn{
+    background:transparent;
+    border:1px solid var(--blood);
+    color:var(--blood-bright);
+    font-family:var(--font-mono);
+    font-size:0.75rem;
+    letter-spacing:0.03em;
+    padding:9px 18px;
+    border-radius:2px;
+  }
+  .danger-btn:hover{ background:rgba(140,42,34,0.15); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>CAIN <span>//</span> Fichas</h1>
+  <div class="subtitle">exorcistas · pecado · caça</div>
+</header>
+
+<main>
+  <section id="area-jogo">
+    <div class="panel-label">Área de Jogo</div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="mesa">Mesa</button>
+      <button class="tab-btn" data-tab="talismas">Talismãs</button>
+      <button class="tab-btn" data-tab="loja">Loja</button>
+      <button class="tab-btn" data-tab="indice">Índice</button>
+      <button class="tab-btn" data-tab="fichasvivo">Fichas ao Vivo</button>
+    </div>
+
+    <div class="tab-panel active" id="tab-mesa">
+      <h2>Mesa</h2>
+      <p class="hint">
+        Quadro branco do tldraw da mesa. Qualquer pessoa com o link consegue
+        desenhar junto, ao vivo.
+      </p>
+      <iframe
+        id="whiteboard-frame"
+        src="https://www.tldraw.com/f/QDIuCWQ_PYZjy0UV-vTQd?d=v-6457.-2357.19678.9347.page"
+        title="Quadro branco da mesa (tldraw)"
+        allow="clipboard-write"
+      ></iframe>
+    </div>
+
+    <div class="tab-panel" id="tab-talismas">
+      <div class="sheet-card" style="margin-bottom:20px;">
+        <h2>Criar Talismã</h2>
+        <div class="hook-form" style="margin-bottom:10px;">
+          <input type="text" id="talisman-name-input" class="field-input" placeholder="Nome do talismã">
+          <label class="hook-form-label">Segmentos
+            <input type="number" id="talisman-segments-input" min="1" value="3">
+          </label>
+        </div>
+        <textarea id="talisman-desc-input" class="big-textarea" placeholder="Descrição..." style="margin-top:0; margin-bottom:12px;"></textarea>
+        <button id="talisman-create-btn">Criar</button>
+      </div>
+
+      <div class="sheet-card">
+        <h2>Talismãs</h2>
+        <div id="talismans-list"></div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-loja">
+      <div class="store-scripts-overlay" id="store-scripts-overlay">💰 <span id="store-scripts-value">0</span> Scripts</div>
+      <div class="sheet-card">
+        <h2>Loja</h2>
+        <p class="hint" style="margin-bottom:16px;">
+          Comprar desconta Scripts na hora. Consumíveis podem ser comprados quantas
+          vezes quiser (a quantidade acumula no Inventário); os demais, só uma vez.
+        </p>
+        <div class="store-grid" id="store-grid"></div>
+        <div class="vitals-note" id="store-status"></div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-indice">
+      <div class="sheet-card">
+        <h2>Índice</h2>
+        <div class="subtab-group" id="indice-subtabs">
+          <div class="subtab-bar">
+            <button class="subtab-btn active" data-subtab="blasfemias">Blasfêmias</button>
+            <button class="subtab-btn" data-subtab="agendas">Agendas</button>
+          </div>
+          <input type="text" id="indice-search" class="field-input" placeholder="Buscar habilidade..." style="margin:14px 0;">
+          <div class="subtab-panel active" id="subtab-blasfemias">
+            <div id="indice-blasfemias-results"></div>
+          </div>
+          <div class="subtab-panel" id="subtab-agendas">
+            <div id="indice-agendas-results"></div>
+          </div>
+        </div>
+        <div class="vitals-note" id="indice-status"></div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-fichasvivo">
+      <div class="sheet-card">
+        <h2>Fichas ao Vivo</h2>
+        <p class="hint" style="margin-bottom:16px;">
+          Resumo em tempo real de quem está com a página aberta — atualiza sozinho,
+          sem precisar de refresh. Cada aparelho/navegador conta como uma ficha
+          separada (ainda não tem login).
+        </p>
+        <div class="store-grid" id="livesheets-grid"></div>
+        <div class="vitals-note" id="livesheets-status"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="ficha">
+    <div class="panel-label">Ficha</div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="vitais">Vitais</button>
+      <button class="tab-btn" data-tab="pericias">Perícias</button>
+      <button class="tab-btn" data-tab="blasfemias">Blasfêmias</button>
+      <button class="tab-btn" data-tab="agendas">Agendas</button>
+      <button class="tab-btn" data-tab="progressao">Progressão</button>
+      <button class="tab-btn" data-tab="inventario">Inventário</button>
+    </div>
+
+    <div class="tab-panel active" id="tab-vitais">
+      <div class="sheet-card character-header">
+        <div class="portrait-placeholder" id="portrait-placeholder">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="8" r="4"/>
+            <path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/>
+          </svg>
+          <span>Retrato</span>
+        </div>
+        <input type="file" id="portrait-file-input" accept="image/*" class="hidden">
+        <div class="character-fields">
+          <label>Nome
+            <input type="text" id="character-name-input" placeholder="Nome do personagem">
+          </label>
+          <label>CAT
+            <input type="number" id="character-cat-input" min="1" value="1">
+          </label>
+        </div>
+      </div>
+
+      <div class="sheet-card vitals-card">
+
+        <div class="vitals-group">
+          <div class="vitals-group-header">
+            <span class="name">Vida</span>
+            <div class="vitals-inputs">
+              <label>Stress máx.
+                <input type="number" id="stress-max-input" min="1" value="6">
+              </label>
+              <label>Injuries máx.
+                <input type="number" id="injuries-max-input" min="1" value="3">
+              </label>
+            </div>
+          </div>
+          <div class="pip-track" id="stress-pips"></div>
+          <div class="pip-track" id="injury-pips"></div>
+          <div class="damage-row">
+            <input type="number" id="damage-input" min="0" value="0" placeholder="dano">
+            <button id="apply-damage">Aplicar dano</button>
+            <button id="reset-vitals" title="Zera stress e injuries, sem mexer nos máximos">Descansar</button>
+          </div>
+          <div class="vitals-note" id="vitals-note"></div>
+        </div>
+
+        <div class="vitals-group">
+          <div class="vitals-group-header">
+            <span class="name">Ganchos</span>
+          </div>
+          <div class="hook-form">
+            <input type="text" id="hook-text-input" class="field-input" placeholder="Descrição do gancho">
+            <input type="number" id="hook-count-input" min="1" value="3">
+            <button id="hook-create-btn">Criar</button>
+          </div>
+          <div id="hooks-list"></div>
+        </div>
+
+        <div class="vitals-group">
+          <div class="vitals-group-header">
+            <span class="name">Aflições</span>
+          </div>
+          <input type="text" id="afflictions-title-input" class="field-input" placeholder="Título">
+          <textarea id="afflictions-text-input" class="big-textarea hidden" placeholder="Descreva a aflição..."></textarea>
+        </div>
+
+        <div class="vitals-group">
+          <div class="vitals-group-header">
+            <span class="name">Psyche Burst</span>
+            <div class="vitals-inputs">
+              <label>Máx.
+                <input type="number" id="psyche-max-input" min="1" value="3">
+              </label>
+            </div>
+          </div>
+          <div class="pip-track" id="psyche-pips"></div>
+        </div>
+
+        <div class="vitals-group">
+          <div class="vitals-group-header">
+            <span class="name">Pathos</span>
+            <div class="vitals-inputs">
+              <label>Máx.
+                <input type="number" id="agony-max-input" min="1" value="3">
+              </label>
+            </div>
+          </div>
+          <div class="pip-track" id="agony-pips"></div>
+          <div class="bar-track" id="agony-bar-track"><div class="bar-fill" id="agony-bar-fill"></div></div>
+          <button id="agony-btn" class="overflow-btn agony hidden">Divine Agony</button>
+        </div>
+
+        <div class="vitals-group">
+          <div class="vitals-group-header">
+            <span class="name">Sin</span>
+            <div class="vitals-inputs">
+              <label>Máx.
+                <input type="number" id="sin-max-input" min="1" value="10">
+              </label>
+            </div>
+          </div>
+          <div class="pip-track" id="sin-pips"></div>
+          <div class="bar-track" id="sin-bar-track"><div class="bar-fill" id="sin-bar-fill"></div></div>
+          <button id="sin-overflow-btn" class="overflow-btn hidden">Sin Overflow</button>
+
+          <div class="sheet-card sinmark-card hidden" id="sinmark-card">
+            <h2 style="font-size:1rem;">Sin Marks</h2>
+            <div id="sinmark-rows"></div>
+            <div class="vitals-note" id="sinmark-status"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-pericias">
+      <div class="sheet-card">
+        <h2>Perícias</h2>
+        <div id="pericias-list"></div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-blasfemias">
+      <div class="sheet-card">
+        <h2>Blasphemies aprendidas</h2>
+        <p class="hint" style="margin-bottom:16px;">
+          Escolha a blasfêmia e depois a habilidade dela. A linha assume a cor
+          da blasfêmia escolhida, e uma nova linha aparece sozinha assim que
+          você terminar de preencher a anterior.
+        </p>
+        <div id="blasphemy-rows"></div>
+        <div class="vitals-note" id="blasphemy-status"></div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-agendas">
+      <div class="sheet-card" style="margin-bottom:20px;">
+        <h2>Resumo</h2>
+        <div id="agenda-summary">
+          <div class="empty-state">Escolha a agenda principal na primeira linha abaixo.</div>
+        </div>
+
+        <div class="agenda-summary-block" style="margin-top:18px;">
+          <div class="agenda-summary-label">Itens extras em negrito</div>
+          <div class="hook-form" style="margin:0 0 10px;">
+            <input type="text" id="extra-bold-input" class="field-input" placeholder="Item em negrito ganho de outra fonte">
+            <button id="extra-bold-add-btn">Adicionar</button>
+          </div>
+          <ul class="agenda-summary-items" id="extra-bold-items-list"></ul>
+        </div>
+      </div>
+      <div class="sheet-card">
+        <h2>Agendas</h2>
+        <p class="hint" style="margin-bottom:16px;">
+          A primeira linha é sua Agenda principal. As linhas seguintes são
+          agendas secundárias — só o item em negrito delas entra no resumo
+          acima.
+        </p>
+        <div id="agenda-rows"></div>
+        <div class="vitals-note" id="agenda-status"></div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-progressao">
+      <div class="sheet-card" style="margin-bottom:20px;">
+        <div class="vitals-group-header" style="margin-bottom:0;">
+          <span class="name">Avanços disponíveis</span>
+        </div>
+        <div class="pip-track" id="avancos-pips"></div>
+      </div>
+
+      <div class="sheet-card">
+        <h2>Questionário</h2>
+        <p class="hint" style="margin-bottom:14px;">
+          Marque o que se aplica e envie. Cada caixa marcada vale 1 XP.
+        </p>
+        <div id="progress-questions"></div>
+        <button id="submit-progress" style="margin-top:14px;">Enviar</button>
+
+        <div class="vitals-group" style="margin-top:22px;">
+          <div class="vitals-group-header">
+            <span class="name">XP</span>
+            <div class="vitals-inputs">
+              <label>Máx.
+                <input type="number" id="xp-max-input" min="1" value="4">
+              </label>
+            </div>
+          </div>
+          <div class="pip-track" id="xp-pips"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-inventario">
+      <div class="sheet-card" style="margin-bottom:20px;">
+        <h2>Recursos</h2>
+
+        <div class="vitals-group">
+          <div class="vitals-group-header">
+            <span class="name">Scripts</span>
+          </div>
+          <input type="number" id="inventory-scripts-input" class="field-input" min="0" value="0" style="max-width:120px;">
+        </div>
+
+        <div class="vitals-group">
+          <div class="vitals-group-header">
+            <span class="name">Kit Points</span>
+            <div class="vitals-inputs">
+              <label>Máx.
+                <input type="number" id="kp-max-input" min="1" value="5">
+              </label>
+            </div>
+          </div>
+          <div class="pip-track" id="kp-pips"></div>
+        </div>
+      </div>
+
+      <div class="sheet-card">
+        <h2>Itens</h2>
+        <div class="hook-form">
+          <input type="text" id="item-title-input" class="field-input" placeholder="Título do item">
+          <label class="hook-form-label">KP
+            <input type="number" id="item-kp-input" min="0" value="0">
+          </label>
+          <label class="hook-form-label">CAT
+            <input type="number" id="item-cat-input" min="0" value="0">
+          </label>
+          <button id="item-create-btn">Criar</button>
+        </div>
+        <div id="items-list"></div>
+      </div>
+    </div>
+
+    <div class="char-select">
+      <select id="character-picker">
+        <option value="">Selecionar personagem…</option>
+      </select>
+      <button id="save-character">Salvar</button>
+      <button id="load-character">Carregar</button>
+    </div>
+
+    <div id="status" class="status"></div>
+  </section>
+</main>
+
+<footer class="danger-zone">
+  <button id="clear-portrait-btn" class="danger-btn">Limpar foto do personagem</button>
+</footer>
+
+<script>
+  // ------------------------------------------------------------------
+  // CONFIGURAÇÃO: troque pelos dados do SEU projeto Supabase
+  // (Project Settings → API, no painel do supabase.com)
+  // ------------------------------------------------------------------
+  const SUPABASE_URL = "https://wsivcnbzgahfkvqtozwn.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndzaXZjbmJ6Z2FoZmt2cXRvenduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxMDI3NzMsImV4cCI6MjEwNTY3ODc3M30.l6YyRbZJ_1fJ5o-LImW6bFnFhd_DvJWD5jUfBUowCJo";
+  // ------------------------------------------------------------------
+
+  const statusEl = document.getElementById('status');
+
+  let sb = null;
+  const configured = !SUPABASE_URL.includes('SEU-PROJETO');
+
+  if (configured) {
+    sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+
+  function setStatus(msg, isError = false) {
+    statusEl.textContent = msg;
+    statusEl.classList.toggle('error', isError);
+  }
+
+  // ------------------------------------------------------------------
+  // Vida / Psyche Burst / Sin — pip tracks
+  //
+  // Guardado em characters.sheet_data.vitals pelo Salvar/Carregar,
+  // lá embaixo no fim do arquivo.
+  // ------------------------------------------------------------------
+  const vitals = {
+    stressMaxBase: 6,   // "máximo" configurado pelo jogador
+    stress: 0,
+    injuries: 0,
+    injuriesMax: 3,
+    psyche: 0,
+    psycheMax: 3,
+    agony: 0,
+    agonyMax: 3,
+    sin: 0,
+    sinMaxBase: 10,
+    sinOverflowActive: false,
+    sinMarkUnlocked: false,   // vira true pra sempre após o 1º overflow ser desligado
+  };
+
+  function effectiveStressMax() {
+    return Math.max(vitals.stressMaxBase - vitals.injuries, 0);
+  }
+
+  // Cria uma fileira de N bolinhas clicáveis. Clicar na bolinha N
+  // preenche até ali; clicar de novo na última bolinha preenchida
+  // esvazia ela (permite tanto marcar quanto desmarcar).
+  function renderPipTrack(containerId, filled, max, cssClass, onSelect) {
+    const el = document.getElementById(containerId);
+    el.innerHTML = '';
+    for (let i = 0; i < max; i++) {
+      const pip = document.createElement('button');
+      pip.type = 'button';
+      pip.className = 'pip ' + cssClass + (i < filled ? ' filled' : '');
+      pip.setAttribute('aria-label', `${i + 1} de ${max}`);
+      pip.addEventListener('click', () => {
+        const newValue = (filled === i + 1) ? i : i + 1;
+        onSelect(newValue);
+      });
+      el.appendChild(pip);
+    }
+  }
+
+  function renderVitals() {
+    const effMax = effectiveStressMax();
+    vitals.stress = Math.min(vitals.stress, effMax);
+
+    renderPipTrack('stress-pips', vitals.stress, effMax, 'stress', (v) => {
+      vitals.stress = v;
+      renderVitals();
+    });
+
+    renderPipTrack('injury-pips', vitals.injuries, vitals.injuriesMax, 'injury', (v) => {
+      vitals.injuries = v;
+      renderVitals();
+    });
+
+    renderPipTrack('psyche-pips', vitals.psyche, vitals.psycheMax, 'psyche', (v) => {
+      vitals.psyche = v;
+      renderVitals();
+    });
+
+    vitals.agony = Math.min(vitals.agony, vitals.agonyMax);
+    renderPipTrack('agony-pips', vitals.agony, vitals.agonyMax, 'agony', (v) => {
+      vitals.agony = v;
+      renderVitals();
+    });
+    document.getElementById('agony-bar-fill').style.width =
+      (vitals.agonyMax > 0 ? (vitals.agony / vitals.agonyMax) * 100 : 0) + '%';
+
+    const agonyComplete = vitals.agonyMax > 0 && vitals.agony >= vitals.agonyMax;
+    document.getElementById('agony-pips').classList.toggle('complete', agonyComplete);
+    document.getElementById('agony-bar-track').classList.toggle('complete', agonyComplete);
+
+    const agonyBtn = document.getElementById('agony-btn');
+    agonyBtn.classList.toggle('hidden', vitals.agony < 1);
+    agonyBtn.classList.toggle('full', agonyComplete);
+
+    const effSinMax = vitals.sinMaxBase;
+    vitals.sin = Math.min(vitals.sin, effSinMax);
+
+    renderPipTrack('sin-pips', vitals.sin, effSinMax, 'sin', (v) => {
+      vitals.sin = v;
+      renderVitals();
+    });
+    document.getElementById('sin-bar-fill').style.width =
+      (effSinMax > 0 ? (vitals.sin / effSinMax) * 100 : 0) + '%';
+
+    const sinBarTrack = document.getElementById('sin-bar-track');
+    const overflowBtn = document.getElementById('sin-overflow-btn');
+    const sinAtMax = effSinMax > 0 && vitals.sin >= effSinMax;
+
+    overflowBtn.classList.toggle('hidden', !sinAtMax && !vitals.sinOverflowActive);
+    overflowBtn.classList.toggle('active', vitals.sinOverflowActive);
+    overflowBtn.textContent = vitals.sinOverflowActive ? 'Sin Overflow (ativo)' : 'Sin Overflow';
+    sinBarTrack.classList.toggle('overflow-active', vitals.sinOverflowActive);
+    document.getElementById('sin-pips').classList.toggle('overflow-active', vitals.sinOverflowActive);
+
+    const sinmarkCard = document.getElementById('sinmark-card');
+    sinmarkCard.classList.toggle('hidden', !vitals.sinMarkUnlocked);
+    sinmarkCard.classList.toggle('overflow-active', vitals.sinOverflowActive);
+
+    const note = document.getElementById('vitals-note');
+    if (vitals.injuries >= vitals.injuriesMax) {
+      note.textContent = 'Injuries no limite — o próximo dano pode ser fatal.';
+    } else if (effMax === 0) {
+      note.textContent = 'Stress máximo chegou a 0 pelas injuries acumuladas.';
+    } else {
+      note.textContent = '';
+    }
+
+    pushLiveSummary();
+  }
+
+  // Aplica dano: preenche o stress; o que ultrapassar vira injury,
+  // zera o stress e reduz o stress máximo em 1 — repete até o dano acabar
+  // ou até bater no máximo de injuries.
+  function applyDamage(amount) {
+    let remaining = amount;
+    while (remaining > 0) {
+      const effMax = effectiveStressMax();
+      const capacity = effMax - vitals.stress;
+
+      if (remaining <= capacity) {
+        vitals.stress += remaining;
+        remaining = 0;
+      } else {
+        remaining -= capacity;
+        if (vitals.injuries >= vitals.injuriesMax) {
+          break; // já no limite de injuries — o resto do dano fica "pendente"
+        }
+        vitals.injuries += 1;
+        vitals.stress = 0;
+      }
+    }
+    renderVitals();
+  }
+
+  document.getElementById('stress-max-input').addEventListener('input', (e) => {
+    vitals.stressMaxBase = Math.max(parseInt(e.target.value) || 1, 1);
+    renderVitals();
+  });
+  document.getElementById('injuries-max-input').addEventListener('input', (e) => {
+    vitals.injuriesMax = Math.max(parseInt(e.target.value) || 1, 1);
+    vitals.injuries = Math.min(vitals.injuries, vitals.injuriesMax);
+    renderVitals();
+  });
+  document.getElementById('psyche-max-input').addEventListener('input', (e) => {
+    vitals.psycheMax = Math.max(parseInt(e.target.value) || 1, 1);
+    vitals.psyche = Math.min(vitals.psyche, vitals.psycheMax);
+    renderVitals();
+  });
+  document.getElementById('agony-max-input').addEventListener('input', (e) => {
+    vitals.agonyMax = Math.max(parseInt(e.target.value) || 1, 1);
+    vitals.agony = Math.min(vitals.agony, vitals.agonyMax);
+    renderVitals();
+  });
+  document.getElementById('sin-max-input').addEventListener('input', (e) => {
+    vitals.sinMaxBase = Math.max(parseInt(e.target.value) || 1, 1);
+    vitals.sin = Math.min(vitals.sin, effectiveSinMax());
+    renderVitals();
+  });
+
+  document.getElementById('agony-btn').addEventListener('click', () => {
+    vitals.agony = 0; // Divine Agony consome o Pathos acumulado
+    renderVitals();
+  });
+
+  document.getElementById('sin-overflow-btn').addEventListener('click', () => {
+    if (vitals.sinOverflowActive) {
+      // desligando: consome o overflow — reduz o máximo em 2 e reseta o Sin
+      vitals.sinMaxBase = Math.max(vitals.sinMaxBase - 2, 0);
+      document.getElementById('sin-max-input').value = vitals.sinMaxBase;
+      vitals.sin = 0;
+      vitals.sinOverflowActive = false;
+      if (!vitals.sinMarkUnlocked) {
+        vitals.sinMarkUnlocked = true;
+        sinMarkPicker.loadGroups();
+      } else {
+        sinMarkPicker.addRow();
+      }
+    } else {
+      vitals.sinOverflowActive = true;
+    }
+    renderVitals();
+  });
+
+  document.getElementById('apply-damage').addEventListener('click', () => {
+    const input = document.getElementById('damage-input');
+    const amount = Math.max(parseInt(input.value) || 0, 0);
+    applyDamage(amount);
+    input.value = 0;
+  });
+
+  document.getElementById('reset-vitals').addEventListener('click', () => {
+    vitals.stress = 0;
+    vitals.injuries = 0;
+    renderVitals();
+  });
+
+  renderVitals();
+
+  // ------------------------------------------------------------------
+  // Perícias — mesma lógica de pip-track da Vida/Psyche/Sin, só que
+  // uma trilha de 5 pontos por perícia. Também salva em
+  // characters.sheet_data.pericias.
+  // ------------------------------------------------------------------
+  const PERICIAS_LIST = [
+    'Force', 'Conditioning', 'Coordination', 'Covert', 'Interfacing',
+    'Investigation', 'Surveillance', 'Negotiation', 'Authority', 'Connection',
+  ];
+  const pericias = {};
+  PERICIAS_LIST.forEach(name => { pericias[name] = 0; });
+
+  function renderPericias() {
+    const container = document.getElementById('pericias-list');
+    if (!container.dataset.built) {
+      container.innerHTML = PERICIAS_LIST.map(name => `
+        <div class="pericia-row">
+          <span class="pericia-name">${name}</span>
+          <div class="pip-track" id="pip-${name}"></div>
+        </div>
+      `).join('');
+      container.dataset.built = '1';
+    }
+    PERICIAS_LIST.forEach(name => {
+      renderPipTrack('pip-' + name, pericias[name], 5, 'pericia', (v) => {
+        pericias[name] = v;
+        renderPericias();
+      });
+    });
+  }
+  renderPericias();
+
+  // ------------------------------------------------------------------
+  // Ganchos — lista de itens com quadradinhos clicáveis + barra que
+  // vai de branco a vermelho conforme enche. Salvo em
+  // characters.sheet_data.hooks.
+  // ------------------------------------------------------------------
+  let hookIdCounter = 0;
+  const hooks = []; // { id, text, max, filled }
+
+  function interpolateWhiteToRed(ratio) {
+    const from = [255, 255, 255];
+    const to = [198, 64, 31]; // --blood-bright
+    const r = Math.round(from[0] + (to[0] - from[0]) * ratio);
+    const g = Math.round(from[1] + (to[1] - from[1]) * ratio);
+    const b = Math.round(from[2] + (to[2] - from[2]) * ratio);
+    return `rgb(${r}, ${g}, ${b})`;
+  }
+
+  function renderHooks() {
+    const container = document.getElementById('hooks-list');
+    container.innerHTML = '';
+
+    hooks.forEach(hook => {
+      const entry = document.createElement('div');
+      entry.className = 'hook-entry';
+
+      const header = document.createElement('div');
+      header.className = 'hook-header';
+
+      const title = document.createElement('span');
+      title.className = 'hook-title';
+      title.textContent = hook.text;
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'delete-row-btn';
+      deleteBtn.textContent = '×';
+      deleteBtn.title = 'Excluir gancho';
+      deleteBtn.addEventListener('click', () => {
+        hooks.splice(hooks.indexOf(hook), 1);
+        renderHooks();
+      });
+
+      header.appendChild(title);
+      header.appendChild(deleteBtn);
+      entry.appendChild(header);
+
+      const complete = hook.max > 0 && hook.filled >= hook.max;
+
+      const squareTrack = document.createElement('div');
+      squareTrack.className = 'pip-track hook-squares' + (complete ? ' hook-complete' : '');
+      for (let i = 0; i < hook.max; i++) {
+        const sq = document.createElement('button');
+        sq.type = 'button';
+        sq.className = 'pip square hook' + (i < hook.filled ? ' filled' : '');
+        sq.addEventListener('click', () => {
+          hook.filled = (hook.filled === i + 1) ? i : i + 1;
+          renderHooks();
+        });
+        squareTrack.appendChild(sq);
+      }
+      entry.appendChild(squareTrack);
+
+      const ratio = hook.max > 0 ? hook.filled / hook.max : 0;
+      const barTrack = document.createElement('div');
+      barTrack.className = 'bar-track hook-bar-track' + (complete ? ' hook-complete' : '');
+      const barFill = document.createElement('div');
+      barFill.className = 'bar-fill';
+      barFill.style.width = (ratio * 100) + '%';
+      barFill.style.background = complete ? '' : interpolateWhiteToRed(ratio);
+      barTrack.appendChild(barFill);
+      entry.appendChild(barTrack);
+
+      if (complete) {
+        const resolveBtn = document.createElement('button');
+        resolveBtn.type = 'button';
+        resolveBtn.className = 'resolve-btn';
+        resolveBtn.textContent = 'Resolver';
+        resolveBtn.addEventListener('click', () => {
+          hooks.splice(hooks.indexOf(hook), 1);
+          renderHooks();
+        });
+        entry.appendChild(resolveBtn);
+      }
+
+      container.appendChild(entry);
+    });
+  }
+
+  document.getElementById('hook-create-btn').addEventListener('click', () => {
+    const textInput = document.getElementById('hook-text-input');
+    const countInput = document.getElementById('hook-count-input');
+    const text = textInput.value.trim();
+    const count = Math.max(parseInt(countInput.value) || 1, 1);
+
+    if (!text) {
+      setStatus('Escreva o texto do gancho antes de criar.', true);
+      return;
+    }
+
+    hooks.push({ id: hookIdCounter++, text, max: count, filled: 0 });
+    textInput.value = '';
+    countInput.value = 3;
+    renderHooks();
+  });
+
+  // ------------------------------------------------------------------
+  // Aflições — título revela o campo de texto grande. Salvo em
+  // characters.sheet_data.afflictions.
+  // ------------------------------------------------------------------
+  const afflictionsTitleInput = document.getElementById('afflictions-title-input');
+  const afflictionsTextInput = document.getElementById('afflictions-text-input');
+  afflictionsTitleInput.addEventListener('input', () => {
+    afflictionsTextInput.classList.toggle('hidden', afflictionsTitleInput.value.trim() === '');
+  });
+
+  // ------------------------------------------------------------------
+  // Inventário — Scripts + Kit Points (bolinhas brancas) como recursos
+  // do personagem, e uma lista de itens; cada item tem seu próprio
+  // custo em KP e botão "Usar". Salvo em characters.sheet_data.inventory.
+  // ------------------------------------------------------------------
+  const inventory = {
+    scripts: 0,
+    kp: 0,
+    kpMax: 5,
+  };
+  let itemIdCounter = 0;
+  const inventoryItems = []; // { id, title, cat, description, useQty }
+
+  function renderInventoryResources() {
+    inventory.kp = Math.min(inventory.kp, inventory.kpMax);
+    renderPipTrack('kp-pips', inventory.kp, inventory.kpMax, 'kp', (v) => {
+      inventory.kp = v;
+      renderInventoryResources();
+    });
+  }
+
+  function renderItems() {
+    const container = document.getElementById('items-list');
+    container.innerHTML = '';
+
+    inventoryItems.forEach(item => {
+      const entry = document.createElement('div');
+      entry.className = 'hook-entry';
+
+      const header = document.createElement('div');
+      header.className = 'hook-header';
+
+      const title = document.createElement('span');
+      title.className = 'hook-title';
+      title.textContent = `${item.title} · CAT ${item.cat} · ${item.kp} KP · Qtd ${item.quantity ?? 1}`;
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'delete-row-btn';
+      deleteBtn.textContent = '×';
+      deleteBtn.title = 'Excluir item';
+      deleteBtn.addEventListener('click', () => {
+        inventoryItems.splice(inventoryItems.indexOf(item), 1);
+        renderItems();
+        renderStoreItems();
+      });
+
+      header.appendChild(title);
+      header.appendChild(deleteBtn);
+      entry.appendChild(header);
+
+      const textarea = document.createElement('textarea');
+      textarea.className = 'big-textarea';
+      textarea.style.marginTop = '0';
+      textarea.placeholder = 'Descreva o item...';
+      textarea.value = item.description || '';
+      textarea.addEventListener('input', (e) => { item.description = e.target.value; });
+      entry.appendChild(textarea);
+
+      const useBtn = document.createElement('button');
+      useBtn.type = 'button';
+      useBtn.style.marginTop = '10px';
+      useBtn.textContent = 'Usar';
+      useBtn.addEventListener('click', () => {
+        if ((item.quantity ?? 0) <= 0) {
+          setStatus(`Itens insuficientes de "${item.title}".`, true);
+          return;
+        }
+        if (inventory.kp < item.kp) {
+          setStatus(`KP insuficiente pra usar "${item.title}" (precisa de ${item.kp}, tem ${inventory.kp}).`, true);
+          return;
+        }
+        item.quantity = (item.quantity ?? 1) - 1;
+        inventory.kp -= item.kp;
+        renderInventoryResources();
+        renderItems();
+        renderStoreItems();
+        setStatus(`"${item.title}" usado — ${item.kp} KP gasto. Restam ${item.quantity}.`);
+      });
+      entry.appendChild(useBtn);
+
+      container.appendChild(entry);
+    });
+  }
+
+  function renderScriptsOverlay() {
+    const el = document.getElementById('store-scripts-value');
+    if (el) el.textContent = inventory.scripts;
+  }
+
+  document.getElementById('inventory-scripts-input').addEventListener('input', (e) => {
+    inventory.scripts = Math.max(parseInt(e.target.value) || 0, 0);
+    renderScriptsOverlay();
+  });
+  document.getElementById('kp-max-input').addEventListener('input', (e) => {
+    inventory.kpMax = Math.max(parseInt(e.target.value) || 1, 1);
+    renderInventoryResources();
+  });
+
+  document.getElementById('item-create-btn').addEventListener('click', () => {
+    const titleInput = document.getElementById('item-title-input');
+    const kpInput = document.getElementById('item-kp-input');
+    const catInput = document.getElementById('item-cat-input');
+    const title = titleInput.value.trim();
+    if (!title) {
+      setStatus('Escreva o título do item antes de criar.', true);
+      return;
+    }
+    inventoryItems.push({
+      id: itemIdCounter++,
+      title,
+      kp: parseInt(kpInput.value) || 0,
+      cat: parseInt(catInput.value) || 0,
+      description: '',
+      quantity: 1,
+    });
+    titleInput.value = '';
+    kpInput.value = 0;
+    catInput.value = 0;
+    renderItems();
+  });
+
+  renderInventoryResources();
+  renderScriptsOverlay();
+
+  // ------------------------------------------------------------------
+  // Loja — lê a tabela 'items' (só os que têm categoria preenchida,
+  // ou seja, os que vieram da aba visível STORE da planilha). Comprar
+  // desconta Scripts na hora; consumíveis acumulam quantidade no mesmo
+  // item do Inventário em vez de criar uma linha nova a cada compra.
+  // Não aplica nenhum efeito de status descrito no texto do item.
+  // ------------------------------------------------------------------
+  let storeItemsCache = null;
+
+  const CATEGORY_CLASS = {
+    'Aesthetics': 'cat-aesthetics',
+    'Possessions': 'cat-possessions',
+    'Comfort / Career': 'cat-comfort',
+    'Occult / Medical': 'cat-occult',
+  };
+
+  function alreadyOwnsSingle(name) {
+    return inventoryItems.some(i => i.title === name);
+  }
+
+  function ownedQuantity(name) {
+    const found = inventoryItems.find(i => i.title === name);
+    return found ? (found.quantity ?? 0) : 0;
+  }
+
+  function buyStoreItem(item) {
+    if (item.purchase_type === 'single' && alreadyOwnsSingle(item.name)) {
+      return; // o botão já devia estar desabilitado
+    }
+
+    const cost = item.scrip || 0;
+    if (inventory.scripts < cost) {
+      setStatus(`Scripts insuficientes pra comprar "${item.name}" (precisa de ${cost}, tem ${inventory.scripts}).`, true);
+      return;
+    }
+
+    inventory.scripts -= cost;
+    document.getElementById('inventory-scripts-input').value = inventory.scripts;
+    renderScriptsOverlay();
+
+    if (item.purchase_type === 'consumable') {
+      const existing = inventoryItems.find(i => i.title === item.name);
+      if (existing) {
+        existing.quantity = (existing.quantity ?? 0) + 1;
+      } else {
+        inventoryItems.push({
+          id: itemIdCounter++,
+          title: item.name,
+          kp: item.kp || 0,
+          cat: item.cat_requirement || 0,
+          description: item.description || '',
+          quantity: 1,
+        });
+      }
+    } else {
+      inventoryItems.push({
+        id: itemIdCounter++,
+        title: item.name,
+        kp: item.kp || 0,
+        cat: item.cat_requirement || 0,
+        description: item.description || '',
+        quantity: 1,
+      });
+    }
+
+    renderItems();
+    renderStoreItems();
+    setStatus(`"${item.name}" comprado por ${cost} Scripts.`);
+  }
+
+  function renderStoreItems() {
+    const container = document.getElementById('store-grid');
+    if (!storeItemsCache) return;
+    container.innerHTML = '';
+
+    storeItemsCache.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'store-card ' + (CATEGORY_CLASS[item.category] || '');
+
+      const category = document.createElement('div');
+      category.className = 'store-card-category';
+      category.textContent = item.category || '';
+      card.appendChild(category);
+
+      const name = document.createElement('div');
+      name.className = 'store-card-name';
+      name.textContent = item.name;
+      card.appendChild(name);
+
+      const desc = document.createElement('div');
+      desc.className = 'store-card-desc';
+      desc.textContent = item.description || '';
+      card.appendChild(desc);
+
+      const meta = document.createElement('div');
+      meta.className = 'store-card-meta';
+      const metaParts = [];
+      if (item.scrip != null) metaParts.push(`${item.scrip} Scrip`);
+      if (item.purchase_type === 'consumable') metaParts.push(`${item.kp || 0} KP por uso`);
+      if (item.cat_requirement) metaParts.push(`CAT ${item.cat_requirement}+`);
+      meta.textContent = metaParts.join(' · ');
+      card.appendChild(meta);
+
+      if (item.purchase_type === 'consumable') {
+        const owned = document.createElement('div');
+        owned.className = 'store-card-meta';
+        owned.style.marginTop = '-8px';
+        owned.textContent = `Você possui: ${ownedQuantity(item.name)}`;
+        card.appendChild(owned);
+      }
+
+      const buyBtn = document.createElement('button');
+      const isOwnedSingle = item.purchase_type === 'single' && alreadyOwnsSingle(item.name);
+      buyBtn.textContent = isOwnedSingle ? 'Comprado' : 'Comprar';
+      buyBtn.disabled = isOwnedSingle;
+      buyBtn.addEventListener('click', () => buyStoreItem(item));
+      card.appendChild(buyBtn);
+
+      container.appendChild(card);
+    });
+  }
+
+  async function loadStoreItems() {
+    if (storeItemsCache) {
+      renderStoreItems();
+      return;
+    }
+    if (!configured) {
+      setStatus('Configure o Supabase no topo do arquivo primeiro.', true);
+      return;
+    }
+    setStatus('Carregando loja...');
+    const { data, error } = await sb.from('items')
+      .select('*')
+      .not('category', 'is', null)
+      .order('category')
+      .order('name');
+    if (error) {
+      setStatus('Erro ao carregar a loja: ' + error.message, true);
+      return;
+    }
+    storeItemsCache = data;
+    setStatus('');
+    renderStoreItems();
+  }
+
+  // ------------------------------------------------------------------
+  // Índice — busca pesquisável de habilidades de Blasfêmias e Agendas,
+  // agrupadas por categoria. Só leitura (é uma referência pra consulta
+  // durante o jogo, não mexe no personagem).
+  // ------------------------------------------------------------------
+  let indexBlasphemyData = null;
+  let indexAgendaData = null;
+
+  function groupAbilitiesByCategory(rows, groupKey, colorMap) {
+    const groups = {};
+    rows.forEach(r => {
+      const g = r[groupKey];
+      if (!groups[g]) groups[g] = { name: g, color: (colorMap && colorMap[g]) || null, abilities: [] };
+      groups[g].abilities.push({ name: r.name, ability: r.ability });
+    });
+    return Object.values(groups);
+  }
+
+  function renderIndexGroups(containerId, groups, query) {
+    const container = document.getElementById(containerId);
+    if (!groups) return;
+    const q = query.trim().toLowerCase();
+    container.innerHTML = '';
+
+    groups.forEach(group => {
+      const filtered = group.abilities.filter(a =>
+        !q ||
+        a.name.toLowerCase().includes(q) ||
+        (a.ability || '').toLowerCase().includes(q) ||
+        group.name.toLowerCase().includes(q)
+      );
+      if (filtered.length === 0) return;
+
+      const section = document.createElement('div');
+      section.className = 'index-group';
+      if (group.color) {
+        section.style.borderLeft = `4px solid ${group.color}`;
+        section.style.paddingLeft = '12px';
+      }
+
+      const heading = document.createElement('div');
+      heading.className = 'index-group-name';
+      heading.textContent = group.name;
+      section.appendChild(heading);
+
+      const list = document.createElement('ul');
+      list.className = 'abilities-list';
+      filtered.forEach(a => {
+        const li = document.createElement('li');
+        const nameEl = document.createElement('div');
+        nameEl.className = 'ability-name';
+        nameEl.textContent = a.name;
+        const textEl = document.createElement('div');
+        textEl.className = 'ability-text';
+        textEl.textContent = a.ability;
+        li.appendChild(nameEl);
+        li.appendChild(textEl);
+        list.appendChild(li);
+      });
+      section.appendChild(list);
+
+      container.appendChild(section);
+    });
+
+    if (!container.children.length) {
+      container.innerHTML = '<div class="empty-state">Nada encontrado.</div>';
+    }
+  }
+
+  function renderIndex() {
+    const query = document.getElementById('indice-search').value;
+    renderIndexGroups('indice-blasfemias-results', indexBlasphemyData, query);
+    renderIndexGroups('indice-agendas-results', indexAgendaData, query);
+  }
+
+  async function loadIndex() {
+    if (indexBlasphemyData && indexAgendaData) {
+      renderIndex();
+      return;
+    }
+    if (!configured) {
+      document.getElementById('indice-status').textContent = 'Configure o Supabase no topo do arquivo primeiro.';
+      document.getElementById('indice-status').classList.add('error');
+      return;
+    }
+    document.getElementById('indice-status').textContent = 'Carregando índice...';
+
+    const [
+      { data: blasphemies, error: bErr },
+      { data: bAbilities, error: baErr },
+      { data: aAbilities, error: aaErr },
+    ] = await Promise.all([
+      sb.from('blasphemies').select('name, color_hex'),
+      sb.from('blasphemy_abilities').select('blasphemy, name, ability').order('blasphemy').order('name'),
+      sb.from('agenda_abilities').select('agenda, name, ability').order('agenda').order('name'),
+    ]);
+
+    const err = bErr || baErr || aaErr;
+    if (err) {
+      document.getElementById('indice-status').textContent = 'Erro ao carregar índice: ' + err.message;
+      document.getElementById('indice-status').classList.add('error');
+      return;
+    }
+
+    const colorMap = {};
+    blasphemies.forEach(b => { colorMap[b.name] = b.color_hex; });
+
+    indexBlasphemyData = groupAbilitiesByCategory(bAbilities, 'blasphemy', colorMap);
+    indexAgendaData = groupAbilitiesByCategory(aAbilities, 'agenda', null);
+
+    document.getElementById('indice-status').textContent = '';
+    document.getElementById('indice-status').classList.remove('error');
+    renderIndex();
+  }
+
+  document.getElementById('indice-search').addEventListener('input', renderIndex);
+
+  // ------------------------------------------------------------------
+  // Talismãs — compartilhados na tabela 'talismans', sincronizados ao
+  // vivo entre clientes via Supabase Realtime. Diferente do resto da
+  // ficha (que só salva quando você clica em "Salvar"), aqui cada
+  // clique já vai pro banco na hora, e qualquer outro cliente aberto
+  // recebe o mesmo evento e atualiza sozinho.
+  // ------------------------------------------------------------------
+  const talismans = []; // cache local; fonte da verdade é a tabela
+
+  function findTalisman(id) {
+    return talismans.find(t => t.id === id);
+  }
+  function upsertLocalTalisman(row) {
+    const existing = findTalisman(row.id);
+    if (existing) {
+      Object.assign(existing, row);
+    } else {
+      talismans.push(row);
+    }
+  }
+  function removeLocalTalisman(id) {
+    const idx = talismans.findIndex(t => t.id === id);
+    if (idx !== -1) talismans.splice(idx, 1);
+  }
+
+  function renderTalismans() {
+    const container = document.getElementById('talismans-list');
+    container.innerHTML = '';
+
+    talismans.forEach(t => {
+      const entry = document.createElement('div');
+      entry.className = 'hook-entry';
+
+      const header = document.createElement('div');
+      header.className = 'hook-header';
+
+      const title = document.createElement('span');
+      title.className = 'hook-title';
+      title.textContent = t.name;
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'delete-row-btn';
+      deleteBtn.textContent = '×';
+      deleteBtn.title = 'Remover talismã';
+      deleteBtn.addEventListener('click', async () => {
+        removeLocalTalisman(t.id);
+        renderTalismans();
+        if (!configured) return;
+        const { error } = await sb.from('talismans').delete().eq('id', t.id);
+        if (error) setStatus('Erro ao remover talismã: ' + error.message, true);
+      });
+
+      header.appendChild(title);
+      header.appendChild(deleteBtn);
+      entry.appendChild(header);
+
+      const pipTrackEl = document.createElement('div');
+      pipTrackEl.className = 'pip-track';
+      pipTrackEl.id = 'talisman-pips-' + t.id;
+      entry.appendChild(pipTrackEl);
+
+      const barTrack = document.createElement('div');
+      barTrack.className = 'bar-track';
+      const barFill = document.createElement('div');
+      barFill.className = 'bar-fill';
+      barFill.style.background = 'var(--gold)';
+      barFill.style.width = (t.segments > 0 ? (t.filled / t.segments) * 100 : 0) + '%';
+      barTrack.appendChild(barFill);
+      entry.appendChild(barTrack);
+
+      if (t.description) {
+        const desc = document.createElement('div');
+        desc.className = 'ability-text';
+        desc.style.marginTop = '10px';
+        desc.textContent = t.description;
+        entry.appendChild(desc);
+      }
+
+      container.appendChild(entry);
+
+      renderPipTrack(pipTrackEl.id, t.filled, t.segments, 'talisman', async (v) => {
+        t.filled = v;
+        renderTalismans();
+        if (!configured) return;
+        const { error } = await sb.from('talismans')
+          .update({ filled: v, updated_at: new Date().toISOString() })
+          .eq('id', t.id);
+        if (error) setStatus('Erro ao sincronizar talismã: ' + error.message, true);
+      });
+    });
+  }
+
+  document.getElementById('talisman-create-btn').addEventListener('click', async () => {
+    const nameInput = document.getElementById('talisman-name-input');
+    const segInput = document.getElementById('talisman-segments-input');
+    const descInput = document.getElementById('talisman-desc-input');
+    const name = nameInput.value.trim();
+    if (!name) {
+      setStatus('Dê um nome ao talismã antes de criar.', true);
+      return;
+    }
+    if (!configured) {
+      setStatus('Configure o Supabase no topo do arquivo primeiro.', true);
+      return;
+    }
+
+    const segments = Math.max(parseInt(segInput.value) || 1, 1);
+    const description = descInput.value.trim();
+    nameInput.value = '';
+    segInput.value = 3;
+    descInput.value = '';
+
+    const { data, error } = await sb.from('talismans')
+      .insert({ name, segments, filled: 0, description })
+      .select()
+      .single();
+    if (error) {
+      setStatus('Erro ao criar talismã: ' + error.message, true);
+      return;
+    }
+    upsertLocalTalisman(data);
+    renderTalismans();
+  });
+
+  async function loadTalismans() {
+    if (!configured) {
+      renderTalismans();
+      return;
+    }
+    const { data, error } = await sb.from('talismans').select('*').order('created_at');
+    if (error) {
+      setStatus('Erro ao carregar talismãs: ' + error.message, true);
+      return;
+    }
+    talismans.length = 0;
+    data.forEach(row => talismans.push(row));
+    renderTalismans();
+  }
+
+  if (configured) {
+    sb.channel('talismans-sync')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'talismans' }, (payload) => {
+        upsertLocalTalisman(payload.new);
+        renderTalismans();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'talismans' }, (payload) => {
+        upsertLocalTalisman(payload.new);
+        renderTalismans();
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'talismans' }, (payload) => {
+        removeLocalTalisman(payload.old.id);
+        renderTalismans();
+      })
+      .subscribe();
+  }
+
+  loadTalismans();
+
+  // ------------------------------------------------------------------
+  // Progressão — Avanços (decorativo) + questionário de XP
+  // ------------------------------------------------------------------
+  const PROGRESS_QUESTIONS = [
+    'Você sobreviveu?',
+    'Você cumpriu o primeiro item da sua agenda?',
+    'Você cumpriu pelo menos um item da agenda destacado em negrito?',
+    'Você cumpriu 2 ou mais itens da agenda destacado em negrito?',
+    'Você sofreu algum ferimento ou aflição?',
+  ];
+  const AVANCOS_DISPLAY_MAX = 10; // só o tamanho da trilha decorativa
+
+  const progress = {
+    avancos: 0,
+    xp: 0,
+    xpMax: 4,
+  };
+
+  // Trilha só pra exibir — sem clique, sem interação.
+  function renderStaticPips(containerId, filled, max, cssClass) {
+    const el = document.getElementById(containerId);
+    el.innerHTML = '';
+    for (let i = 0; i < max; i++) {
+      const pip = document.createElement('span');
+      pip.className = 'pip static ' + cssClass + (i < filled ? ' filled' : '');
+      el.appendChild(pip);
+    }
+  }
+
+  function renderProgress() {
+    renderStaticPips('avancos-pips', Math.min(progress.avancos, AVANCOS_DISPLAY_MAX), AVANCOS_DISPLAY_MAX, 'avanco');
+
+    progress.xp = Math.min(progress.xp, progress.xpMax);
+    renderPipTrack('xp-pips', progress.xp, progress.xpMax, 'xp', (v) => {
+      progress.xp = v;
+      renderProgress();
+    });
+
+    const container = document.getElementById('progress-questions');
+    if (!container.dataset.built) {
+      container.innerHTML = PROGRESS_QUESTIONS.map((q, i) => `
+        <div class="question-row">
+          <input type="checkbox" id="progress-q-${i}">
+          <label for="progress-q-${i}">${q}</label>
+        </div>
+      `).join('');
+      container.dataset.built = '1';
+    }
+  }
+
+  function addXp(amount) {
+    progress.xp += amount;
+    while (progress.xpMax > 0 && progress.xp >= progress.xpMax) {
+      progress.xp -= progress.xpMax;
+      progress.avancos += 1;
+    }
+    renderProgress();
+  }
+
+  document.getElementById('submit-progress').addEventListener('click', () => {
+    let gained = 0;
+    PROGRESS_QUESTIONS.forEach((_, i) => {
+      const cb = document.getElementById('progress-q-' + i);
+      if (cb.checked) gained++;
+      cb.checked = false;
+    });
+    addXp(gained);
+  });
+
+  document.getElementById('xp-max-input').addEventListener('input', (e) => {
+    progress.xpMax = Math.max(parseInt(e.target.value) || 1, 1);
+    renderProgress();
+  });
+
+  renderProgress();
+
+  // ------------------------------------------------------------------
+  // Abas
+  // ------------------------------------------------------------------
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const scope = btn.closest('section');
+      scope.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      scope.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+      if (btn.dataset.tab === 'blasfemias') blasphemyPicker.loadGroups();
+      if (btn.dataset.tab === 'agendas') agendaPicker.loadGroups();
+      if (btn.dataset.tab === 'loja') loadStoreItems();
+      if (btn.dataset.tab === 'indice') loadIndex();
+      if (btn.dataset.tab === 'fichasvivo') loadLiveSheets();
+    });
+  });
+
+  // Sub-abas (ex: Blasfêmias/Agendas dentro de Índice) — escopo próprio,
+  // isolado do grupo de abas principal acima.
+  document.querySelectorAll('.subtab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const group = btn.closest('.subtab-group');
+      group.querySelectorAll('.subtab-btn').forEach(b => b.classList.remove('active'));
+      group.querySelectorAll('.subtab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('subtab-' + btn.dataset.subtab).classList.add('active');
+    });
+  });
+
+  // ------------------------------------------------------------------
+  // Picker genérico: fileira "categoria → habilidade" com auto-adição
+  // de linha nova e botão de remover. Usado pra Blasfêmias e Agendas —
+  // só muda de qual tabela cada um lê.
+  //
+  // TODO (lembrete pro próximo passo): hoje 'blasphemy_abilities.blasphemy'
+  // e 'agenda_abilities.agenda' referenciam o NOME (texto) da categoria.
+  // O plano é trocar para 'blasphemies.id' / 'agendas.id' (chave numérica)
+  // + colunas '..._id' nas tabelas de habilidade, filtrando pelo ID em vez
+  // do nome. Só precisa mudar o que é selecionado/filtrado aqui dentro.
+  // ------------------------------------------------------------------
+  function createRowPicker(opts) {
+    let groupCache = null;                 // [{name, ...extraFields}]
+    const abilityCache = {};               // { groupName: [{name, ability}] }
+    let idCounter = 0;
+    let rows = [{ id: idCounter++, group: '', ability: '' }];
+    const statusEl = document.getElementById(opts.statusElId);
+
+    async function loadGroups() {
+      if (groupCache || !configured) { render(); return; }
+      statusEl.textContent = 'Carregando...';
+      const cols = ['name', ...(opts.groupExtraSelect || [])].join(', ');
+      const { data, error } = await sb.from(opts.groupTable).select(cols).order('name');
+      if (error) {
+        statusEl.textContent = 'Erro ao carregar: ' + error.message;
+        statusEl.classList.add('error');
+        return;
+      }
+      groupCache = data;
+      statusEl.textContent = '';
+      render();
+      if (opts.onChange) opts.onChange(rows, groupCache);
+    }
+
+    async function loadAbilities(groupName) {
+      if (abilityCache[groupName]) return abilityCache[groupName];
+      let query = sb
+        .from(opts.abilityTable)
+        .select('name, ability')
+        .eq(opts.abilityGroupCol, groupName)
+        .order('name');
+      if (opts.excludePassives) query = query.eq('is_passive', false);
+      const { data, error } = await query;
+      if (error) {
+        statusEl.textContent = 'Erro ao carregar habilidades: ' + error.message;
+        return [];
+      }
+      abilityCache[groupName] = data;
+      return data;
+    }
+
+    function normalize() {
+      if (opts.autoGrow === false) return; // crescimento controlado de fora (ex: Sin Overflow)
+      const last = rows[rows.length - 1];
+      if (!last || (last.group && last.ability)) {
+        rows.push({ id: idCounter++, group: '', ability: '' });
+      }
+    }
+
+    function addRow() {
+      rows.push({ id: idCounter++, group: '', ability: '' });
+      render();
+    }
+
+    function getRows() {
+      return rows.map(r => ({ group: r.group, ability: r.ability }));
+    }
+
+    // Restaura linhas salvas: garante que os grupos/habilidades usados já
+    // estejam carregados no cache antes de desenhar, senão o nome não
+    // aparece (só o value cru do <option>).
+    async function setRows(savedRows) {
+      if (!groupCache) await loadGroups();
+      const usedGroups = [...new Set((savedRows || []).map(r => r.group).filter(Boolean))];
+      await Promise.all(usedGroups.map(g => loadAbilities(g)));
+
+      rows = (savedRows && savedRows.length)
+        ? savedRows.map(r => ({ id: idCounter++, group: r.group || '', ability: r.ability || '' }))
+        : [{ id: idCounter++, group: '', ability: '' }];
+
+      normalize();
+      render();
+      if (opts.onChange) opts.onChange(rows, groupCache);
+    }
+
+    function render() {
+      const container = document.getElementById(opts.rowsContainerId);
+      container.innerHTML = '';
+      const headeredGroups = new Set();
+
+      rows.forEach(row => {
+        if (opts.showGroupHeader && row.group && !headeredGroups.has(row.group) && groupCache) {
+          headeredGroups.add(row.group);
+          const g = groupCache.find(g => g.name === row.group);
+          if (g) {
+            const header = document.createElement('div');
+            header.className = 'blasphemy-header';
+            if (opts.groupColorField && g[opts.groupColorField]) {
+              header.style.borderLeftColor = g[opts.groupColorField];
+            }
+            header.innerHTML = `
+              ${g.image_url ? `<img src="${g.image_url}" alt="${g.name}">` : ''}
+              <div class="blasphemy-header-text">
+                <div class="blasphemy-header-name">${g.name}</div>
+                ${g.passive_name ? `<div class="blasphemy-passive-label">Passiva · ${g.passive_name}</div>` : ''}
+                ${g.passive_description ? `<div class="blasphemy-passive-desc">${g.passive_description}</div>` : ''}
+              </div>
+            `;
+            container.appendChild(header);
+          }
+        }
+
+        const entry = document.createElement('div');
+        entry.className = 'ability-entry';
+
+        if (opts.groupColorField && row.group && groupCache) {
+          const g = groupCache.find(g => g.name === row.group);
+          if (g && g[opts.groupColorField]) {
+            entry.style.borderLeft = `4px solid ${g[opts.groupColorField]}`;
+            entry.style.paddingLeft = '12px';
+          }
+        }
+
+        const rowEl = document.createElement('div');
+        rowEl.className = 'ability-row';
+
+        const groupSelect = document.createElement('select');
+        groupSelect.innerHTML = `<option value="">${opts.groupPlaceholder}</option>` +
+          (groupCache || []).map(g =>
+            `<option value="${g.name}" ${g.name === row.group ? 'selected' : ''}>${g.name}</option>`
+          ).join('');
+        groupSelect.addEventListener('change', async (e) => {
+          row.group = e.target.value;
+          row.ability = '';
+          if (row.group) await loadAbilities(row.group);
+          normalize();
+          render();
+          if (opts.onChange) opts.onChange(rows, groupCache);
+        });
+
+        const abilitySelect = document.createElement('select');
+        const abilityOptions = row.group ? (abilityCache[row.group] || []) : [];
+        abilitySelect.disabled = !row.group;
+        abilitySelect.innerHTML = '<option value="">' + (row.group ? 'Habilidade…' : 'Escolha primeiro') + '</option>' +
+          abilityOptions.map(a =>
+            `<option value="${a.name}" ${a.name === row.ability ? 'selected' : ''}>${a.name}</option>`
+          ).join('');
+        abilitySelect.addEventListener('change', (e) => {
+          row.ability = e.target.value;
+          normalize();
+          render();
+          if (opts.onChange) opts.onChange(rows, groupCache);
+        });
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'delete-row-btn';
+        deleteBtn.textContent = '×';
+        deleteBtn.title = 'Remover';
+        deleteBtn.addEventListener('click', () => {
+          rows = rows.filter(r => r.id !== row.id);
+          normalize();
+          render();
+          if (opts.onChange) opts.onChange(rows, groupCache);
+        });
+
+        rowEl.appendChild(groupSelect);
+        rowEl.appendChild(abilitySelect);
+        rowEl.appendChild(deleteBtn);
+        entry.appendChild(rowEl);
+
+        if (row.group && row.ability) {
+          const detail = (abilityCache[row.group] || []).find(a => a.name === row.ability);
+          if (detail) {
+            const detailEl = document.createElement('div');
+            detailEl.className = 'ability-detail';
+            detailEl.innerHTML = `<div class="ability-detail-name">${detail.name}</div>${detail.ability}`;
+            entry.appendChild(detailEl);
+          }
+        }
+
+        container.appendChild(entry);
+      });
+    }
+
+    return { loadGroups, addRow, getRows, setRows };
+  }
+
+  const blasphemyPicker = createRowPicker({
+    rowsContainerId: 'blasphemy-rows',
+    statusElId: 'blasphemy-status',
+    groupTable: 'blasphemies',
+    groupExtraSelect: ['color_hex', 'image_url', 'passive_name', 'passive_description'],
+    groupColorField: 'color_hex',
+    groupPlaceholder: 'Blasfêmia…',
+    abilityTable: 'blasphemy_abilities',
+    abilityGroupCol: 'blasphemy',
+    excludePassives: true,
+    showGroupHeader: true,
+  });
+
+  const agendaPicker = createRowPicker({
+    rowsContainerId: 'agenda-rows',
+    statusElId: 'agenda-status',
+    groupTable: 'agendas',
+    groupExtraSelect: ['normal_item', 'bolded_item'],
+    groupPlaceholder: 'Agenda…',
+    abilityTable: 'agenda_abilities',
+    abilityGroupCol: 'agenda',
+    onChange: renderAgendaSummary,
+  });
+
+  const sinMarkPicker = createRowPicker({
+    rowsContainerId: 'sinmark-rows',
+    statusElId: 'sinmark-status',
+    groupTable: 'sin_mark_locations',
+    groupPlaceholder: 'Localização…',
+    abilityTable: 'sin_marks',
+    abilityGroupCol: 'location',
+    autoGrow: false,
+  });
+
+  // Linha 0 = Agenda principal (mostra os dois itens).
+  // Linhas seguintes = agendas secundárias (mostra só o item em negrito).
+  function renderAgendaSummary(rows, groupCache) {
+    const el = document.getElementById('agenda-summary');
+    if (!groupCache) return;
+
+    const primaryName = rows[0] ? rows[0].group : '';
+    const secondaryNames = [...new Set(rows.slice(1).map(r => r.group).filter(Boolean))];
+    const primary = groupCache.find(g => g.name === primaryName);
+
+    let html = '';
+    if (primary) {
+      html += `
+        <div class="agenda-summary-block">
+          <div class="agenda-summary-label">Agenda principal · ${primary.name}</div>
+          <ul class="agenda-summary-items">
+            <li>${primary.normal_item || '—'}</li>
+            <li><strong>${primary.bolded_item || '—'}</strong></li>
+          </ul>
+        </div>`;
+    } else {
+      html += `<div class="empty-state">Escolha a agenda principal na primeira linha abaixo.</div>`;
+    }
+
+    if (secondaryNames.length) {
+      html += `
+        <div class="agenda-summary-block">
+          <div class="agenda-summary-label">Agendas secundárias</div>
+          <ul class="agenda-summary-items">
+            ${secondaryNames.map(n => {
+              const g = groupCache.find(x => x.name === n);
+              return `<li><strong>${g ? g.bolded_item || '—' : '—'}</strong> <span class="agenda-summary-tag">(${n})</span></li>`;
+            }).join('')}
+          </ul>
+        </div>`;
+    }
+
+    el.innerHTML = html;
+  }
+
+  // ------------------------------------------------------------------
+  // Itens extras em negrito — ganhos por outras fontes (habilidades de
+  // outros módulos etc.), fora do fluxo normal de Agenda. Local por
+  // enquanto, mesmo esquema dos Ganchos/Aflições.
+  // ------------------------------------------------------------------
+  let extraBoldIdCounter = 0;
+  const extraBoldItems = []; // { id, text }
+
+  function renderExtraBoldItems() {
+    const list = document.getElementById('extra-bold-items-list');
+    list.innerHTML = '';
+    extraBoldItems.forEach(item => {
+      const li = document.createElement('li');
+      li.className = 'extra-bold-item';
+
+      const text = document.createElement('strong');
+      text.textContent = item.text;
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'delete-row-btn';
+      deleteBtn.textContent = '×';
+      deleteBtn.title = 'Remover';
+      deleteBtn.addEventListener('click', () => {
+        extraBoldItems.splice(extraBoldItems.indexOf(item), 1);
+        renderExtraBoldItems();
+      });
+
+      li.appendChild(text);
+      li.appendChild(deleteBtn);
+      list.appendChild(li);
+    });
+  }
+
+  document.getElementById('extra-bold-add-btn').addEventListener('click', () => {
+    const input = document.getElementById('extra-bold-input');
+    const text = input.value.trim();
+    if (!text) return;
+    extraBoldItems.push({ id: extraBoldIdCounter++, text });
+    input.value = '';
+    renderExtraBoldItems();
+  });
+
+  // ------------------------------------------------------------------
+  // Retrato — upload pro Supabase Storage (bucket "portraits")
+  // ------------------------------------------------------------------
+  let currentPortraitUrl = null;
+  let currentPortraitPath = null; // caminho dentro do bucket, usado pra apagar
+
+  function uid() {
+    return (crypto.randomUUID) ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
+  }
+
+  function renderPortrait() {
+    const el = document.getElementById('portrait-placeholder');
+    if (currentPortraitUrl) {
+      el.innerHTML = `<img src="${currentPortraitUrl}" alt="Retrato do personagem">`;
+    } else {
+      el.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="8" r="4"/>
+          <path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/>
+        </svg>
+        <span>Retrato</span>`;
+    }
+  }
+
+  async function uploadPortrait(file) {
+    if (!configured) {
+      setStatus('Configure o Supabase no topo do arquivo primeiro.', true);
+      return;
+    }
+    setStatus('Enviando foto...');
+
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const path = `${uid()}.${ext}`;
+    const { error: upErr } = await sb.storage.from('portraits').upload(path, file, { upsert: false });
+    if (upErr) {
+      setStatus('Erro ao enviar foto: ' + upErr.message, true);
+      return;
+    }
+
+    // some a foto anterior pra não acumular arquivo órfão no bucket
+    if (currentPortraitPath) {
+      await sb.storage.from('portraits').remove([currentPortraitPath]);
+    }
+
+    const { data: urlData } = sb.storage.from('portraits').getPublicUrl(path);
+    currentPortraitPath = path;
+    currentPortraitUrl = urlData.publicUrl;
+    renderPortrait();
+    setStatus('Foto atualizada — clique em "Salvar" pra guardar no personagem.');
+  }
+
+  document.getElementById('portrait-placeholder').addEventListener('click', () => {
+    document.getElementById('portrait-file-input').click();
+  });
+  document.getElementById('portrait-file-input').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) uploadPortrait(file);
+    e.target.value = ''; // permite escolher o mesmo arquivo de novo depois
+  });
+
+  document.getElementById('clear-portrait-btn').addEventListener('click', async () => {
+    if (!currentPortraitUrl && !currentPortraitPath) {
+      setStatus('Não há foto pra apagar.', true);
+      return;
+    }
+    const name = document.getElementById('character-name-input').value.trim() || 'este personagem';
+    const ok = confirm(`Tem certeza que quer apagar a foto de "${name}"? Isso remove o arquivo do banco também.`);
+    if (!ok) return;
+
+    setStatus('Apagando foto...');
+    if (currentPortraitPath && configured) {
+      const { error } = await sb.storage.from('portraits').remove([currentPortraitPath]);
+      if (error) {
+        setStatus('Erro ao apagar do banco: ' + error.message, true);
+        return;
+      }
+    }
+    currentPortraitUrl = null;
+    currentPortraitPath = null;
+    renderPortrait();
+
+    if (currentCharacterId) {
+      await persistCharacter(); // já grava o personagem sem a foto
+    } else {
+      setStatus('Foto removida.');
+    }
+  });
+
+  // ------------------------------------------------------------------
+  // Salvar / Carregar personagem
+  // ------------------------------------------------------------------
+  let currentCharacterId = null;
+
+  async function refreshCharacterList(selectId) {
+    if (!configured) return;
+    const { data, error } = await sb.from('characters').select('id, name').order('name');
+    if (error) {
+      setStatus('Erro ao listar personagens: ' + error.message, true);
+      return;
+    }
+    const picker = document.getElementById('character-picker');
+    picker.innerHTML = '<option value="">Selecionar personagem…</option>' +
+      data.map(c => `<option value="${c.id}" ${c.id === selectId ? 'selected' : ''}>${c.name}</option>`).join('');
+  }
+
+  // Grava no banco de fato — sem confirmação nenhuma. Quem decide se
+  // pergunta antes é quem chama esta função.
+  async function persistCharacter() {
+    if (!configured) {
+      setStatus('Configure o Supabase no topo do arquivo primeiro.', true);
+      return false;
+    }
+    const name = document.getElementById('character-name-input').value.trim();
+    if (!name) {
+      setStatus('Dê um nome ao personagem antes de salvar.', true);
+      return false;
+    }
+
+    const sheet_data = {
+      cat: parseInt(document.getElementById('character-cat-input').value) || 1,
+      portraitUrl: currentPortraitUrl,
+      portraitPath: currentPortraitPath,
+      vitals: { ...vitals },
+      pericias: { ...pericias },
+      progress: { ...progress },
+      blasphemyRows: blasphemyPicker.getRows(),
+      agendaRows: agendaPicker.getRows(),
+      sinMarkRows: sinMarkPicker.getRows(),
+      extraBoldItems: extraBoldItems.map(i => i.text),
+      hooks: hooks.map(h => ({ text: h.text, max: h.max, filled: h.filled })),
+      afflictions: {
+        title: document.getElementById('afflictions-title-input').value,
+        text: document.getElementById('afflictions-text-input').value,
+      },
+      inventory: {
+        scripts: inventory.scripts,
+        kpMax: inventory.kpMax,
+        kp: inventory.kp,
+        items: inventoryItems.map(i => ({ title: i.title, kp: i.kp, cat: i.cat, description: i.description, quantity: i.quantity ?? 1 })),
+      },
+    };
+
+    setStatus('Salvando...');
+    let result;
+    if (currentCharacterId) {
+      result = await sb.from('characters')
+        .update({ name, sheet_data, updated_at: new Date().toISOString() })
+        .eq('id', currentCharacterId)
+        .select()
+        .single();
+    } else {
+      result = await sb.from('characters')
+        .insert({ name, sheet_data })
+        .select()
+        .single();
+    }
+
+    if (result.error) {
+      setStatus('Erro ao salvar: ' + result.error.message, true);
+      return false;
+    }
+
+    currentCharacterId = result.data.id;
+    await refreshCharacterList(currentCharacterId);
+    setStatus(`"${name}" salvo.`);
+    return true;
+  }
+
+  // Botão "Salvar": se já existe um save carregado, confirma antes de
+  // sobrescrever.
+  async function saveCharacter() {
+    if (currentCharacterId) {
+      const name = document.getElementById('character-name-input').value.trim() || 'este personagem';
+      const ok = confirm(`Isso vai sobrescrever o save de "${name}". Continuar?`);
+      if (!ok) {
+        setStatus('Salvamento cancelado.');
+        return;
+      }
+    }
+    await persistCharacter();
+  }
+
+  async function loadCharacter() {
+    if (!configured) {
+      setStatus('Configure o Supabase no topo do arquivo primeiro.', true);
+      return;
+    }
+    const id = document.getElementById('character-picker').value;
+    if (!id) {
+      setStatus('Selecione um personagem na lista primeiro.', true);
+      return;
+    }
+
+    setStatus('Carregando...');
+    const { data, error } = await sb.from('characters').select('*').eq('id', id).single();
+    if (error) {
+      setStatus('Erro ao carregar: ' + error.message, true);
+      return;
+    }
+
+    currentCharacterId = data.id;
+    const sd = data.sheet_data || {};
+
+    document.getElementById('character-name-input').value = data.name || '';
+    document.getElementById('character-cat-input').value = sd.cat || 1;
+
+    currentPortraitUrl = sd.portraitUrl || null;
+    currentPortraitPath = sd.portraitPath || null;
+    renderPortrait();
+
+    Object.assign(vitals, sd.vitals || {});
+    Object.assign(pericias, sd.pericias || {});
+    Object.assign(progress, sd.progress || {});
+
+    await Promise.all([
+      blasphemyPicker.setRows(sd.blasphemyRows || []),
+      agendaPicker.setRows(sd.agendaRows || []),
+      sinMarkPicker.setRows(sd.sinMarkRows || []),
+    ]);
+
+    extraBoldItems.length = 0;
+    extraBoldIdCounter = 0;
+    (sd.extraBoldItems || []).forEach(text => {
+      extraBoldItems.push({ id: extraBoldIdCounter++, text });
+    });
+    renderExtraBoldItems();
+
+    hooks.length = 0;
+    hookIdCounter = 0;
+    (sd.hooks || []).forEach(h => {
+      hooks.push({ id: hookIdCounter++, text: h.text, max: h.max, filled: h.filled });
+    });
+    renderHooks();
+
+    const afflTitle = document.getElementById('afflictions-title-input');
+    const afflText = document.getElementById('afflictions-text-input');
+    afflTitle.value = sd.afflictions?.title || '';
+    afflText.value = sd.afflictions?.text || '';
+    afflText.classList.toggle('hidden', afflTitle.value.trim() === '');
+
+    inventory.scripts = sd.inventory?.scripts || 0;
+    inventory.kpMax = sd.inventory?.kpMax || 5;
+    inventory.kp = sd.inventory?.kp || 0;
+    document.getElementById('inventory-scripts-input').value = inventory.scripts;
+    document.getElementById('kp-max-input').value = inventory.kpMax;
+    renderScriptsOverlay();
+
+    inventoryItems.length = 0;
+    itemIdCounter = 0;
+    (sd.inventory?.items || []).forEach(i => {
+      inventoryItems.push({ id: itemIdCounter++, title: i.title, kp: i.kp, cat: i.cat, description: i.description || '', quantity: i.quantity ?? 1 });
+    });
+    renderItems();
+    renderInventoryResources();
+    renderStoreItems();
+
+    renderVitals();
+    renderPericias();
+    renderProgress();
+    setStatus(`"${data.name}" carregado.`);
+  }
+
+  document.getElementById('save-character').addEventListener('click', saveCharacter);
+  document.getElementById('load-character').addEventListener('click', loadCharacter);
+
+  refreshCharacterList();
+
+  // ------------------------------------------------------------------
+  // Fichas ao Vivo — autosave contínuo (resumo rápido) numa tabela com
+  // Realtime, igual os Talismãs. Diferente do "Salvar" de sempre: aqui
+  // não tem botão, qualquer mudança nos Vitais já manda sozinho depois
+  // de um instante sem mexer, e qualquer um com a página aberta vê.
+  //
+  // Como ainda não tem login, cada navegador/aparelho tem um ID próprio
+  // guardado no localStorage — é o jeito de não uma pessoa sobrescrever
+  // a ficha da outra.
+  // ------------------------------------------------------------------
+  function getClientId() {
+    let id = localStorage.getItem('cain_client_id');
+    if (!id) {
+      id = uid();
+      localStorage.setItem('cain_client_id', id);
+    }
+    return id;
+  }
+  const clientId = getClientId();
+
+  var liveSummaryTimer = null; // 'var' de propósito: evita erro de "temporal dead zone",
+                                 // já que pushLiveSummary() é chamada por renderVitals()
+                                 // bem antes desta linha ser alcançada na primeira execução.
+  function pushLiveSummary() {
+    if (!configured) return;
+    clearTimeout(liveSummaryTimer);
+    liveSummaryTimer = setTimeout(async () => {
+      const name = document.getElementById('character-name-input').value.trim();
+      if (!name) return; // sem nome, não mostra pro DM ainda
+
+      const summary = {
+        name,
+        cat: parseInt(document.getElementById('character-cat-input').value) || 1,
+        stress: vitals.stress,
+        stressMax: effectiveStressMax(),
+        injuries: vitals.injuries,
+        injuriesMax: vitals.injuriesMax,
+        psyche: vitals.psyche,
+        psycheMax: vitals.psycheMax,
+        sin: vitals.sin,
+        sinMax: vitals.sinMaxBase,
+        agony: vitals.agony,
+        agonyMax: vitals.agonyMax,
+      };
+
+      const { error } = await sb.from('live_sheets')
+        .upsert({ client_id: clientId, summary, updated_at: new Date().toISOString() });
+      if (error) {
+        console.error('Erro ao atualizar ficha ao vivo:', error.message);
+      }
+    }, 1500);
+  }
+
+  document.getElementById('character-name-input').addEventListener('input', pushLiveSummary);
+  document.getElementById('character-cat-input').addEventListener('input', pushLiveSummary);
+
+  const liveSheets = []; // cache local; fonte da verdade é a tabela
+
+  function upsertLocalLiveSheet(row) {
+    const existing = liveSheets.find(s => s.client_id === row.client_id);
+    if (existing) {
+      Object.assign(existing, row);
+    } else {
+      liveSheets.push(row);
+    }
+  }
+  function removeLocalLiveSheet(clientId) {
+    const idx = liveSheets.findIndex(s => s.client_id === clientId);
+    if (idx !== -1) liveSheets.splice(idx, 1);
+  }
+
+  function timeAgo(isoString) {
+    const seconds = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
+    if (seconds < 60) return `há ${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `há ${minutes}min`;
+    return `há ${Math.floor(minutes / 60)}h`;
+  }
+
+  function renderLiveSheets() {
+    const container = document.getElementById('livesheets-grid');
+    container.innerHTML = '';
+
+    if (!liveSheets.length) {
+      container.innerHTML = '<div class="empty-state">Nenhuma ficha ativa no momento.</div>';
+      return;
+    }
+
+    liveSheets
+      .slice()
+      .sort((a, b) => (a.summary.name || '').localeCompare(b.summary.name || ''))
+      .forEach(sheet => {
+        const s = sheet.summary || {};
+        const card = document.createElement('div');
+        card.className = 'livesheet-card';
+        card.innerHTML = `
+          <div class="livesheet-name">${s.name || '(sem nome)'} · CAT ${s.cat ?? '—'}</div>
+          <div class="livesheet-stat">Vida <span>${s.stress ?? 0}/${s.stressMax ?? 0} stress · ${s.injuries ?? 0}/${s.injuriesMax ?? 0} injuries</span></div>
+          <div class="livesheet-stat">Psyche Burst <span>${s.psyche ?? 0}/${s.psycheMax ?? 0}</span></div>
+          <div class="livesheet-stat">Sin <span>${s.sin ?? 0}/${s.sinMax ?? 0}</span></div>
+          <div class="livesheet-stat">Pathos <span>${s.agony ?? 0}/${s.agonyMax ?? 0}</span></div>
+          <div class="livesheet-updated">atualizado ${timeAgo(sheet.updated_at)}</div>
+        `;
+        container.appendChild(card);
+      });
+  }
+
+  async function loadLiveSheets() {
+    if (!configured) {
+      document.getElementById('livesheets-status').textContent = 'Configure o Supabase no topo do arquivo primeiro.';
+      document.getElementById('livesheets-status').classList.add('error');
+      return;
+    }
+    const { data, error } = await sb.from('live_sheets').select('*');
+    if (error) {
+      document.getElementById('livesheets-status').textContent = 'Erro ao carregar fichas ao vivo: ' + error.message;
+      document.getElementById('livesheets-status').classList.add('error');
+      return;
+    }
+    liveSheets.length = 0;
+    data.forEach(row => liveSheets.push(row));
+    renderLiveSheets();
+
+    if (!window._liveSheetsChannelSubscribed) {
+      window._liveSheetsChannelSubscribed = true;
+      sb.channel('live-sheets-sync')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'live_sheets' }, (payload) => {
+          upsertLocalLiveSheet(payload.new);
+          renderLiveSheets();
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'live_sheets' }, (payload) => {
+          upsertLocalLiveSheet(payload.new);
+          renderLiveSheets();
+        })
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'live_sheets' }, (payload) => {
+          removeLocalLiveSheet(payload.old.client_id);
+          renderLiveSheets();
+        })
+        .subscribe();
+    }
+  }
+</script>
+
+</body>
+</html>
