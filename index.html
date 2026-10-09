@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CAIN — Fichas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:          #14110F;
+    --bg-raised:   #1B1714;
+    --line:        #33291F;
+    --bone:        #E7DFCF;
+    --bone-dim:    #A79C89;
+    --blood:       #8C2A22;
+    --blood-bright:#C6401F;
+    --gold:        #AE8A4E;
+    --font-display: 'Cinzel', serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0; min-height:100%;
+    background:var(--bg);
+    color:var(--bone);
+    font-family:var(--font-body);
+  }
+  body{
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+    background-image:
+      radial-gradient(circle at 15% 10%, rgba(140,42,34,0.08), transparent 40%),
+      radial-gradient(circle at 85% 90%, rgba(174,138,78,0.06), transparent 45%);
+  }
+  h1{
+    font-family:var(--font-display);
+    font-weight:700;
+    letter-spacing:0.04em;
+    font-size:clamp(1.8rem, 5vw, 2.6rem);
+    margin:0 0 8px;
+    text-align:center;
+  }
+  h1 span{ color:var(--blood-bright); }
+  .subtitle{
+    font-family:var(--font-mono);
+    font-size:0.78rem;
+    color:var(--bone-dim);
+    margin-bottom:40px;
+    text-align:center;
+  }
+  .choices{
+    display:flex;
+    gap:20px;
+    flex-wrap:wrap;
+    justify-content:center;
+    width:100%;
+    max-width:640px;
+  }
+  .choice{
+    flex:1 1 240px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    padding:28px 24px;
+    background:var(--bg-raised);
+    border:1px solid var(--line);
+    border-radius:4px;
+    color:var(--bone);
+    text-decoration:none;
+    text-align:center;
+    transition:border-color .15s, transform .15s;
+  }
+  .choice:hover, .choice:focus-visible{
+    border-color:var(--gold);
+    transform:translateY(-2px);
+    outline:none;
+  }
+  .choice-title{
+    font-family:var(--font-display);
+    font-weight:600;
+    font-size:1.3rem;
+  }
+  .choice-desc{
+    font-size:0.85rem;
+    color:var(--bone-dim);
+  }
+</style>
+</head>
+<body>
+
+<h1>CAIN <span>//</span> Fichas</h1>
+<div class="subtitle">exorcistas · pecado · caça</div>
+
+<div class="choices">
+  <a class="choice" href="dm.html">
+    <span class="choice-title">Mestre</span>
+    <span class="choice-desc">Página do DM</span>
+  </a>
+  <a class="choice" href="jogador.html">
+    <span class="choice-title">Jogador</span>
+    <span class="choice-desc">Ficha, mesa, loja e chat</span>
+  </a>
+</div>
+
+</body>
+</html>

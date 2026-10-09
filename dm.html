@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CAIN — Mestre</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:          #14110F;
+    --bg-raised:   #1B1714;
+    --line:        #33291F;
+    --bone:        #E7DFCF;
+    --bone-dim:    #A79C89;
+    --blood:       #8C2A22;
+    --blood-bright:#C6401F;
+    --gold:        #AE8A4E;
+    --font-display: 'Cinzel', serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:var(--bg);
+    color:var(--bone);
+    font-family:var(--font-body);
+  }
+  body{
+    display:flex;
+    flex-direction:column;
+    background-image:
+      radial-gradient(circle at 15% 10%, rgba(140,42,34,0.08), transparent 40%),
+      radial-gradient(circle at 85% 90%, rgba(174,138,78,0.06), transparent 45%);
+  }
+  .hidden{ display:none !important; }
+
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    flex:0 0 78px;
+    padding:0 clamp(16px,4vw,48px);
+    border-bottom:1px solid var(--line);
+  }
+  header h1{
+    font-family:var(--font-display);
+    font-weight:700;
+    letter-spacing:0.04em;
+    font-size:1.5rem;
+    margin:0;
+  }
+  header h1 span{ color:var(--blood-bright); }
+  header .subtitle{
+    font-family:var(--font-mono);
+    font-size:0.75rem;
+    color:var(--bone-dim);
+  }
+  .back-link{ color:var(--gold); text-decoration:none; }
+  .back-link:hover{ text-decoration:underline; }
+
+  /* Conteúdo: abas em cima, painel ocupando o resto da tela */
+  main{
+    flex:1;
+    min-height:0;
+    padding:12px clamp(12px,2vw,24px) 16px;
+    display:flex;
+    flex-direction:column;
+  }
+  .difficulty-bar{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-bottom:12px;
+  }
+  .difficulty-label{
+    font-family:var(--font-mono);
+    font-size:0.75rem;
+    color:var(--bone-dim);
+    margin-right:4px;
+  }
+  .diff-btn.active{
+    border-color:var(--gold);
+    background:var(--bg);
+    color:var(--bone);
+  }
+  #difficulty-status{ font-family:var(--font-mono); font-size:0.72rem; color:var(--blood-bright); }
+  .tab-bar{
+    display:flex;
+    gap:22px;
+    border-bottom:1px solid var(--line);
+    margin-bottom:14px;
+  }
+  .tab-btn{
+    background:transparent;
+    border:none;
+    border-bottom:2px solid transparent;
+    color:var(--bone-dim);
+    font-family:var(--font-display);
+    font-size:1rem;
+    font-weight:600;
+    padding:6px 2px 10px;
+    border-radius:0;
+    cursor:pointer;
+  }
+  .tab-btn:hover{ background:transparent; color:var(--bone); }
+  .tab-btn.active{
+    color:var(--bone);
+    border-bottom-color:var(--blood-bright);
+  }
+  .tab-panel{ display:none; flex:1; min-height:0; }
+  .tab-panel.active{ display:flex; flex-direction:column; }
+  #tab-fichasvivo{ overflow-y:auto; }
+
+  /* Mesa: o quadro branco ocupa o resto da tela */
+  #whiteboard-frame{
+    flex:1;
+    width:100%;
+    border:1px solid var(--line);
+    border-radius:2px;
+    background:var(--bg-raised);
+  }
+
+  /* ---------- Botões e campos ---------- */
+  button{
+    background:var(--bg-raised);
+    color:var(--bone);
+    border:1px solid var(--line);
+    font-family:var(--font-body);
+    font-size:0.85rem;
+    padding:8px 12px;
+    border-radius:2px;
+    cursor:pointer;
+  }
+  button:hover{ background:var(--blood); }
+  .field-input{
+    width:100%;
+    background:var(--bg);
+    border:1px solid var(--line);
+    color:var(--bone);
+    font-family:var(--font-body);
+    font-size:0.92rem;
+    padding:8px 10px;
+    border-radius:2px;
+  }
+  .field-input:focus{ outline:1px solid var(--gold); }
+  .delete-row-btn{
+    flex-shrink:0;
+    width:34px; height:34px;
+    padding:0;
+    background:transparent;
+    border:1px solid var(--line);
+    color:var(--bone-dim);
+    line-height:1;
+  }
+  .delete-row-btn:hover{
+    background:transparent;
+    border-color:var(--blood-bright);
+    color:var(--blood-bright);
+  }
+  .empty-state{ color:var(--bone-dim); font-size:0.9rem; line-height:1.6; }
+
+  /* ---------- Fichas ao Vivo ---------- */
+  .sheet-card{
+    background:var(--bg-raised);
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:20px;
+  }
+  .sheet-card h2{
+    font-family:var(--font-display);
+    margin:0 0 4px;
+    font-size:1.3rem;
+  }
+  .hint{
+    color:var(--bone-dim);
+    font-size:0.9rem;
+    line-height:1.5;
+    margin:0 0 16px;
+  }
+  .store-grid{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap:14px;
+  }
+  @media (max-width: 600px){
+    .store-grid{ grid-template-columns: 1fr; }
+  }
+  .livesheet-card{
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:16px;
+  }
+  .livesheet-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:8px;
+    margin-bottom:10px;
+  }
+  .livesheet-name{
+    font-weight:600;
+    font-size:0.95rem;
+  }
+  .livesheet-del{ width:26px; height:26px; font-size:0.9rem; }
+  .livesheet-stat{
+    display:flex;
+    justify-content:space-between;
+    font-size:0.85rem;
+    color:var(--bone-dim);
+    padding:4px 0;
+    border-top:1px solid var(--line);
+  }
+  .livesheet-stat:first-of-type{ border-top:none; }
+  .livesheet-stat span{ color:var(--bone); font-family:var(--font-mono); }
+  .livesheet-updated{
+    font-family:var(--font-mono);
+    font-size:0.68rem;
+    color:var(--bone-dim);
+    margin-top:10px;
+  }
+  .vitals-note{
+    font-family:var(--font-mono);
+    font-size:0.72rem;
+    color:var(--blood-bright);
+    margin-top:8px;
+    min-height:1em;
+  }
+
+  /* ---------- Widget de chat (botão lateral) ---------- */
+  #chat-widget-btn{
+    position:fixed;
+    right:10px;
+    top:calc(50vh - 22px);
+    z-index:50;
+    width:44px; height:44px;
+    padding:0;
+    font-size:1.3rem;
+    line-height:1;
+    background:var(--bg-raised);
+    border:1px solid var(--gold);
+    border-radius:8px;
+    transition:filter .15s, transform .15s;
+  }
+  #chat-widget-btn:hover{ background:var(--bg-raised); filter:brightness(1.25); transform:scale(1.06); }
+  .chat-badge{
+    position:absolute;
+    top:-7px; right:-7px;
+    min-width:18px; height:18px;
+    padding:0 4px;
+    border-radius:9px;
+    background:var(--blood-bright);
+    color:#fff;
+    font-family:var(--font-mono);
+    font-size:0.68rem;
+    line-height:18px;
+    text-align:center;
+  }
+  #chat-widget-panel{
+    position:fixed;
+    right:64px;
+    top:90px;
+    bottom:20px;
+    max-height:620px;
+    width:min(380px, calc(100vw - 80px));
+    z-index:49;
+    display:flex;
+    flex-direction:column;
+    background:var(--bg);
+    border:1px solid var(--gold);
+    border-radius:6px;
+    padding:12px;
+    box-shadow:0 8px 30px rgba(0,0,0,0.5);
+  }
+  .chat-widget-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    font-family:var(--font-display);
+    font-weight:600;
+    margin-bottom:10px;
+  }
+  .chat-panel{
+    flex:1 1 0;
+    min-height:0;
+    display:flex;
+    flex-direction:column;
+  }
+  .chat-feed{
+    flex:1;
+    min-height:0;
+    overflow-y:auto;
+    background:var(--bg-raised);
+    border:1px solid var(--line);
+    border-radius:2px;
+    padding:10px 12px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .chat-entry{ font-size:0.85rem; line-height:1.5; }
+  .chat-author{ font-weight:600; color:var(--bone); }
+  .chat-time{
+    font-family:var(--font-mono);
+    font-size:0.68rem;
+    color:var(--bone-dim);
+  }
+  .chat-message-text{ color:var(--bone-dim); }
+  .chat-roll{ color:var(--gold); }
+  .chat-success{ color:#5FC08A; }
+  .chat-fail{ color:var(--blood-bright); font-weight:600; }
+  .chat-roll-breakdown{
+    font-family:var(--font-mono);
+    font-size:0.75rem;
+    color:var(--bone-dim);
+  }
+  .chat-input-row{
+    display:flex;
+    gap:8px;
+    margin-top:8px;
+  }
+  .chat-input-row input[type="text"]:not(.field-input){
+    width:110px;
+    background:var(--bg);
+    border:1px solid var(--line);
+    color:var(--bone);
+    font-family:var(--font-mono);
+    font-size:0.85rem;
+    padding:8px 10px;
+    border-radius:2px;
+  }
+  .chat-input-row .field-input{ flex:1; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>CAIN <span>//</span> Mestre</h1>
+  <div class="subtitle">exorcistas · pecado · caça · <a href="index.html" class="back-link">trocar de página</a></div>
+</header>
+
+<main>
+  <div class="difficulty-bar">
+    <span class="difficulty-label">Dificuldade dos testes</span>
+    <button type="button" class="diff-btn active" data-diff="normal">Normal (4+)</button>
+    <button type="button" class="diff-btn" data-diff="hard">Difícil (6)</button>
+    <span id="difficulty-status"></span>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="mesa">Mesa</button>
+    <button class="tab-btn" data-tab="fichasvivo">Fichas ao Vivo</button>
+  </div>
+
+  <div class="tab-panel active" id="tab-mesa">
+    <iframe
+      id="whiteboard-frame"
+      src="https://www.tldraw.com/f/QDIuCWQ_PYZjy0UV-vTQd?d=v-6457.-2357.19678.9347.page"
+      title="Quadro branco da mesa (tldraw)"
+      allow="clipboard-write"
+    ></iframe>
+  </div>
+
+  <div class="tab-panel" id="tab-fichasvivo">
+    <div class="sheet-card">
+      <h2>Fichas ao Vivo</h2>
+      <p class="hint">
+        Resumo em tempo real dos personagens que os jogadores estão usando — atualiza
+        sozinho, sem precisar de refresh. Aparece um card por personagem.
+      </p>
+      <div class="store-grid" id="livesheets-grid"></div>
+      <div class="vitals-note" id="livesheets-status"></div>
+    </div>
+  </div>
+</main>
+
+<!-- Widget de chat/dados: botão fixo na lateral que abre o painel -->
+<div id="chat-widget">
+  <button type="button" id="chat-widget-btn" title="Chat e dados" aria-label="Abrir chat e dados">
+    💬<span class="chat-badge hidden" id="chat-badge">0</span>
+  </button>
+  <div id="chat-widget-panel" class="hidden">
+    <div class="chat-widget-header">
+      <span>Chat e dados</span>
+      <button type="button" id="chat-widget-close" class="delete-row-btn" title="Fechar">×</button>
+    </div>
+    <div class="chat-panel">
+      <div class="chat-feed" id="chat-feed"></div>
+      <div class="chat-input-row">
+        <input type="text" id="chat-message-input" class="field-input" placeholder="Mensagem...">
+        <button id="chat-send-btn">Enviar</button>
+      </div>
+      <div class="chat-input-row">
+        <input type="text" id="chat-roll-input" placeholder="2d6+3">
+        <button id="chat-roll-btn">🎲 Rolar</button>
+      </div>
+      <div class="vitals-note" id="chat-status"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Mesmo projeto Supabase da página do jogador (a chave "anon" é pública por design).
+  const SUPABASE_URL = "https://wsivcnbzgahfkvqtozwn.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndzaXZjbmJ6Z2FoZmt2cXRvenduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxMDI3NzMsImV4cCI6MjEwNTY3ODc3M30.l6YyRbZJ_1fJ5o-LImW6bFnFhd_DvJWD5jUfBUowCJo";
+
+  const AUTHOR = 'Mestre';
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  function setChatStatus(msg, isError = false) {
+    const el = document.getElementById('chat-status');
+    el.textContent = msg;
+    el.style.color = isError ? 'var(--blood-bright)' : 'var(--gold)';
+  }
+
+  // Mensagens e nomes vêm de outras pessoas: nunca injetar como HTML cru
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // ------------------------------------------------------------------
+  // Chat + dados — mesma tabela 'game_log' (e mesmo Realtime) da página
+  // do jogador, então todo mundo vê as mesmas mensagens.
+  // ------------------------------------------------------------------
+  const chatLog = [];
+  let chatUnread = 0;
+
+  function rollDiceFormula(formula) {
+    const m = formula.trim().match(/^(\d*)d(\d+)\s*([+-]\s*\d+)?$/i);
+    if (!m) return null;
+    const count = parseInt(m[1] || '1', 10);
+    const sides = parseInt(m[2], 10);
+    const mod = m[3] ? parseInt(m[3].replace(/\s/g, ''), 10) : 0;
+    if (count < 1 || count > 100 || sides < 2) return null;
+    const rolls = [];
+    for (let i = 0; i < count; i++) rolls.push(1 + Math.floor(Math.random() * sides));
+    const sum = rolls.reduce((a, b) => a + b, 0) + mod;
+    return { rolls, mod, sum };
+  }
+
+  function renderChatFeed() {
+    const feed = document.getElementById('chat-feed');
+    feed.innerHTML = '';
+
+    chatLog
+      .slice()
+      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+      .forEach(entry => {
+        const div = document.createElement('div');
+        div.className = 'chat-entry';
+        const time = new Date(entry.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+        if (entry.type === 'roll' && entry.difficulty != null) {
+          // teste com dificuldade: separa os dados que passaram dos que falharam
+          const dice = Array.isArray(entry.dice) ? entry.dice : [];
+          const hits = dice.filter(d => d >= entry.difficulty);
+          const misses = dice.filter(d => d < entry.difficulty);
+          const diffLabel = entry.difficulty >= 6 ? 'Difícil (6)' : `Normal (${entry.difficulty}+)`;
+          div.innerHTML = `
+            <span class="chat-author">${escapeHtml(entry.author)}</span> <span class="chat-time">${time}</span><br>
+            <span class="chat-roll">🎲 ${escapeHtml(entry.roll_formula)} · ${diffLabel}</span><br>
+            ${hits.length
+              ? `<span class="chat-success">Sucessos: <strong>${escapeHtml(hits.join(' '))}</strong></span>`
+              : `<span class="chat-fail">Sem sucessos → +1 Pathos</span>`}
+            ${misses.length ? `<span class="chat-roll-breakdown"> · Falhas: ${escapeHtml(misses.join(' '))}</span>` : ''}
+            ${entry.roll_breakdown && entry.roll_breakdown.includes('→') ? `<br><span class="chat-roll-breakdown">${escapeHtml(entry.roll_breakdown)}</span>` : ''}
+          `;
+        } else if (entry.type === 'roll') {
+          div.innerHTML = `
+            <span class="chat-author">${escapeHtml(entry.author)}</span> <span class="chat-time">${time}</span><br>
+            <span class="chat-roll">🎲 ${escapeHtml(entry.roll_formula)} → <strong>${escapeHtml(entry.roll_result)}</strong></span>
+            <span class="chat-roll-breakdown">${escapeHtml(entry.roll_breakdown)}</span>
+          `;
+        } else {
+          div.innerHTML = `
+            <span class="chat-author">${escapeHtml(entry.author)}</span> <span class="chat-time">${time}</span><br>
+            <span class="chat-message-text">${escapeHtml(entry.message)}</span>
+          `;
+        }
+        feed.appendChild(div);
+      });
+
+    if (!chatLog.length) {
+      feed.innerHTML = '<div class="empty-state">Nenhuma mensagem ainda.</div>';
+    } else {
+      feed.scrollTop = feed.scrollHeight; // sempre puxa pra última mensagem
+    }
+  }
+
+  async function sendChatMessage() {
+    const input = document.getElementById('chat-message-input');
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    const { error } = await sb.from('game_log').insert({ author: AUTHOR, type: 'chat', message: text });
+    if (error) setChatStatus('Erro ao enviar mensagem: ' + error.message, true);
+    else setChatStatus('');
+  }
+
+  async function sendDiceRoll() {
+    const input = document.getElementById('chat-roll-input');
+    const formula = input.value.trim();
+    if (!formula) return;
+    const result = rollDiceFormula(formula);
+    if (!result) {
+      setChatStatus('Fórmula inválida. Use algo como 2d6+3.', true);
+      return;
+    }
+    const breakdown = `[${result.rolls.join(', ')}]` + (result.mod ? ` ${result.mod >= 0 ? '+' : ''}${result.mod}` : '');
+    const { error } = await sb.from('game_log').insert({
+      author: AUTHOR, type: 'roll',
+      roll_formula: formula, roll_result: result.sum, roll_breakdown: breakdown,
+    });
+    if (error) setChatStatus('Erro ao rolar: ' + error.message, true);
+    else setChatStatus('');
+  }
+
+  function updateChatBadge() {
+    const badge = document.getElementById('chat-badge');
+    badge.textContent = chatUnread;
+    badge.classList.toggle('hidden', chatUnread === 0);
+  }
+
+  function setChatOpen(open) {
+    document.getElementById('chat-widget-panel').classList.toggle('hidden', !open);
+    if (open) {
+      chatUnread = 0;
+      updateChatBadge();
+      const feed = document.getElementById('chat-feed');
+      feed.scrollTop = feed.scrollHeight;
+      document.getElementById('chat-message-input').focus();
+    }
+  }
+
+  document.getElementById('chat-widget-btn').addEventListener('click', () => {
+    setChatOpen(document.getElementById('chat-widget-panel').classList.contains('hidden'));
+  });
+  document.getElementById('chat-widget-close').addEventListener('click', () => setChatOpen(false));
+  document.getElementById('chat-send-btn').addEventListener('click', sendChatMessage);
+  document.getElementById('chat-message-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendChatMessage();
+  });
+  document.getElementById('chat-roll-btn').addEventListener('click', sendDiceRoll);
+  document.getElementById('chat-roll-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendDiceRoll();
+  });
+
+  async function loadChatLog() {
+    const { data, error } = await sb.from('game_log')
+      .select('*')
+      .order('created_at', { ascending: true })
+      .limit(200);
+    if (error) {
+      setChatStatus('Erro ao carregar o chat: ' + error.message, true);
+      return;
+    }
+    chatLog.length = 0;
+    data.forEach(row => chatLog.push(row));
+    renderChatFeed();
+
+    sb.channel('game-log-sync-dm')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'game_log' }, (payload) => {
+        chatLog.push(payload.new);
+        renderChatFeed();
+        if (document.getElementById('chat-widget-panel').classList.contains('hidden')) {
+          chatUnread++;
+          updateChatBadge();
+        }
+      })
+      .subscribe();
+  }
+
+  loadChatLog();
+
+  // ------------------------------------------------------------------
+  // Abas
+  // ------------------------------------------------------------------
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ------------------------------------------------------------------
+  // Fichas ao Vivo — resumo que cada jogador manda sozinho (tabela
+  // 'live_sheets', Realtime). Carrega e assina já na abertura da página,
+  // pra não perder atualização enquanto você está em outra aba.
+  // ------------------------------------------------------------------
+  const liveSheets = [];
+
+  function upsertLocalLiveSheet(row) {
+    const existing = liveSheets.find(s => s.client_id === row.client_id);
+    if (existing) Object.assign(existing, row);
+    else liveSheets.push(row);
+  }
+  function removeLocalLiveSheet(key) {
+    const idx = liveSheets.findIndex(s => s.client_id === key);
+    if (idx !== -1) liveSheets.splice(idx, 1);
+  }
+
+  function timeAgo(isoString) {
+    const seconds = Math.max(0, Math.floor((Date.now() - new Date(isoString).getTime()) / 1000));
+    if (seconds < 60) return `há ${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `há ${minutes}min`;
+    return `há ${Math.floor(minutes / 60)}h`;
+  }
+
+  function renderLiveSheets() {
+    const container = document.getElementById('livesheets-grid');
+    container.innerHTML = '';
+
+    if (!liveSheets.length) {
+      container.innerHTML = '<div class="empty-state">Nenhuma ficha ativa no momento.</div>';
+      return;
+    }
+
+    liveSheets
+      .slice()
+      .sort((a, b) => (a.summary?.name || '').localeCompare(b.summary?.name || ''))
+      .forEach(sheet => {
+        const s = sheet.summary || {};
+        const card = document.createElement('div');
+        card.className = 'livesheet-card';
+        card.innerHTML = `
+          <div class="livesheet-head">
+            <div class="livesheet-name">${escapeHtml(s.name) || '(sem nome)'} · CAT ${escapeHtml(s.cat ?? '—')}</div>
+            <button type="button" class="delete-row-btn livesheet-del" data-key="${escapeHtml(sheet.client_id)}" title="Remover este card">×</button>
+          </div>
+          <div class="livesheet-stat">Vida <span>${escapeHtml(s.stress ?? 0)}/${escapeHtml(s.stressMax ?? 0)} stress · ${escapeHtml(s.injuries ?? 0)}/${escapeHtml(s.injuriesMax ?? 0)} injuries</span></div>
+          <div class="livesheet-stat">Psyche Burst <span>${escapeHtml(s.psyche ?? 0)}/${escapeHtml(s.psycheMax ?? 0)}</span></div>
+          <div class="livesheet-stat">Sin <span>${escapeHtml(s.sin ?? 0)}/${escapeHtml(s.sinMax ?? 0)}</span></div>
+          <div class="livesheet-stat">Pathos <span>${escapeHtml(s.agony ?? 0)}/${escapeHtml(s.agonyMax ?? 0)}</span></div>
+          <div class="livesheet-updated">atualizado ${timeAgo(sheet.updated_at)}</div>
+        `;
+        container.appendChild(card);
+      });
+  }
+
+  async function loadLiveSheets() {
+    const status = document.getElementById('livesheets-status');
+    const { data, error } = await sb.from('live_sheets').select('*');
+    if (error) {
+      status.textContent = 'Erro ao carregar fichas ao vivo: ' + error.message;
+      return;
+    }
+    liveSheets.length = 0;
+    data.forEach(row => liveSheets.push(row));
+    renderLiveSheets();
+
+    sb.channel('live-sheets-sync-dm')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'live_sheets' }, (payload) => {
+        upsertLocalLiveSheet(payload.new);
+        renderLiveSheets();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'live_sheets' }, (payload) => {
+        upsertLocalLiveSheet(payload.new);
+        renderLiveSheets();
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'live_sheets' }, (payload) => {
+        removeLocalLiveSheet(payload.old.client_id);
+        renderLiveSheets();
+      })
+      .subscribe();
+
+    // mantém o "atualizado há Xs" andando mesmo sem evento novo
+    setInterval(renderLiveSheets, 15000);
+  }
+
+  loadLiveSheets();
+
+  // Apagar card (ex: personagem que não está sendo usado). Se o jogador
+  // estiver mesmo com a página aberta, o card volta na próxima alteração.
+  document.getElementById('livesheets-grid').addEventListener('click', async (e) => {
+    const btn = e.target.closest('.livesheet-del');
+    if (!btn) return;
+    const key = btn.dataset.key;
+    removeLocalLiveSheet(key);
+    renderLiveSheets();
+    const { error } = await sb.from('live_sheets').delete().eq('client_id', key);
+    if (error) {
+      document.getElementById('livesheets-status').textContent = 'Erro ao remover o card: ' + error.message;
+    }
+  });
+
+  // ------------------------------------------------------------------
+  // Dificuldade dos testes — fica salva em 'game_state' e os jogadores
+  // leem por Realtime. Continua valendo até você trocar. Padrão: Normal.
+  // ------------------------------------------------------------------
+  let testDifficulty = 'normal';
+
+  function renderDifficultyButtons() {
+    document.querySelectorAll('.diff-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.diff === testDifficulty);
+    });
+  }
+
+  async function setDifficulty(key) {
+    testDifficulty = key;
+    renderDifficultyButtons();
+    const status = document.getElementById('difficulty-status');
+    status.textContent = '';
+    const { error } = await sb.from('game_state')
+      .upsert({ key: 'difficulty', value: key, updated_at: new Date().toISOString() });
+    if (error) status.textContent = 'Erro ao salvar a dificuldade: ' + error.message;
+  }
+
+  document.querySelectorAll('.diff-btn').forEach(btn => {
+    btn.addEventListener('click', () => setDifficulty(btn.dataset.diff));
+  });
+
+  async function loadDifficulty() {
+    const { data } = await sb.from('game_state').select('value').eq('key', 'difficulty').maybeSingle();
+    if (data && (data.value === 'hard' || data.value === 'normal')) {
+      testDifficulty = data.value;
+      renderDifficultyButtons();
+    }
+    sb.channel('game-state-sync-dm')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'game_state' }, (payload) => {
+        const row = payload.new;
+        if (row && row.key === 'difficulty') {
+          testDifficulty = row.value === 'hard' ? 'hard' : 'normal';
+          renderDifficultyButtons();
+        }
+      })
+      .subscribe();
+  }
+  loadDifficulty();
+</script>
+
+</body>
+</html>
