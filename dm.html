@@ -113,6 +113,13 @@
   .tab-panel{ display:none; flex:1; min-height:0; }
   .tab-panel.active{ display:flex; flex-direction:column; }
   #tab-fichasvivo{ overflow-y:auto; }
+  #ficha-frame{
+    flex:1;
+    width:100%;
+    border:1px solid var(--line);
+    border-radius:2px;
+    background:var(--bg);
+  }
 
   /* Mesa: o quadro branco ocupa o resto da tela */
   #whiteboard-frame{
@@ -229,6 +236,51 @@
     margin-top:8px;
     min-height:1em;
   }
+
+  /* ---------- Widget de ajuste da próxima rolagem ---------- */
+  #mod-widget-btn{
+    position:fixed;
+    right:10px;
+    top:calc(50vh + 34px);
+    z-index:50;
+    width:44px; height:44px;
+    padding:0;
+    font-size:1.3rem;
+    line-height:1;
+    background:var(--bg-raised);
+    border:1px solid var(--gold);
+    border-radius:8px;
+    transition:filter .15s, transform .15s;
+  }
+  #mod-widget-btn:hover{ background:var(--bg-raised); filter:brightness(1.25); transform:scale(1.06); }
+  #mod-widget-panel{
+    position:fixed;
+    right:64px;
+    top:90px;
+    width:min(320px, calc(100vw - 80px));
+    z-index:49;
+    background:var(--bg);
+    border:1px solid var(--gold);
+    border-radius:6px;
+    padding:12px 14px 14px;
+    box-shadow:0 8px 30px rgba(0,0,0,0.5);
+  }
+  .mod-hint{ font-size:0.8rem; color:var(--bone-dim); line-height:1.4; margin:0 0 14px; }
+  .mod-row{ margin-bottom:14px; }
+  .mod-label{
+    display:block;
+    font-family:var(--font-mono);
+    font-size:0.7rem;
+    color:var(--bone-dim);
+    margin-bottom:6px;
+  }
+  .mod-stepper{ display:flex; align-items:center; gap:12px; }
+  .mod-stepper button{ width:34px; height:34px; padding:0; font-size:1.1rem; }
+  #mod-dice-value{ min-width:2.2em; text-align:center; font-family:var(--font-mono); font-size:1.1rem; }
+  .mod-diff{ display:flex; gap:6px; flex-wrap:wrap; }
+  .mod-diff button.active{ border-color:var(--gold); background:var(--bg-raised); color:var(--bone); }
+  .mod-actions{ display:flex; gap:8px; margin-bottom:10px; }
+  .mod-status{ font-family:var(--font-mono); font-size:0.72rem; color:var(--gold); min-height:1em; }
 
   /* ---------- Widget de chat (botão lateral) ---------- */
   #chat-widget-btn{
@@ -353,6 +405,7 @@
   <div class="tab-bar">
     <button class="tab-btn active" data-tab="mesa">Mesa</button>
     <button class="tab-btn" data-tab="fichasvivo">Fichas ao Vivo</button>
+    <button class="tab-btn" data-tab="editarficha">Editar Ficha</button>
   </div>
 
   <div class="tab-panel active" id="tab-mesa">
@@ -362,6 +415,11 @@
       title="Quadro branco da mesa (tldraw)"
       allow="clipboard-write"
     ></iframe>
+  </div>
+
+  <div class="tab-panel" id="tab-editarficha">
+    <!-- A mesma ficha do jogador, em "modo DM" (carrega só ao abrir a aba) -->
+    <iframe id="ficha-frame" data-src="jogador.html?modo=dm" title="Ficha do personagem (modo Mestre)"></iframe>
   </div>
 
   <div class="tab-panel" id="tab-fichasvivo">
@@ -399,6 +457,44 @@
       </div>
       <div class="vitals-note" id="chat-status"></div>
     </div>
+  </div>
+</div>
+
+<!-- Widget do DM: ajuste da PRÓXIMA rolagem dos jogadores -->
+<div id="mod-widget">
+  <button type="button" id="mod-widget-btn" title="Ajustar a próxima rolagem" aria-label="Ajustar a próxima rolagem">
+    🎯<span class="chat-badge hidden" id="mod-badge">!</span>
+  </button>
+  <div id="mod-widget-panel" class="hidden">
+    <div class="chat-widget-header">
+      <span>Próxima rolagem</span>
+      <button type="button" id="mod-widget-close" class="delete-row-btn" title="Fechar">×</button>
+    </div>
+    <p class="mod-hint">Vale só pro próximo teste: o primeiro jogador que rolar gasta o ajuste.</p>
+
+    <div class="mod-row">
+      <span class="mod-label">Dados extras</span>
+      <div class="mod-stepper">
+        <button type="button" id="mod-dice-minus" aria-label="Menos um dado">−</button>
+        <span id="mod-dice-value">0</span>
+        <button type="button" id="mod-dice-plus" aria-label="Mais um dado">+</button>
+      </div>
+    </div>
+
+    <div class="mod-row">
+      <span class="mod-label">Dificuldade deste teste</span>
+      <div class="mod-diff">
+        <button type="button" data-mdiff="">Padrão da mesa</button>
+        <button type="button" data-mdiff="normal">Normal (4+)</button>
+        <button type="button" data-mdiff="hard">Difícil (6)</button>
+      </div>
+    </div>
+
+    <div class="mod-actions">
+      <button type="button" id="mod-apply-btn">Aplicar</button>
+      <button type="button" id="mod-clear-btn">Limpar</button>
+    </div>
+    <div class="mod-status" id="mod-status">Nenhum ajuste pendente.</div>
   </div>
 </div>
 
@@ -529,6 +625,7 @@
   function setChatOpen(open) {
     document.getElementById('chat-widget-panel').classList.toggle('hidden', !open);
     if (open) {
+      setModOpen(false);
       chatUnread = 0;
       updateChatBadge();
       const feed = document.getElementById('chat-feed');
@@ -586,6 +683,10 @@
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+      if (btn.dataset.tab === 'editarficha') {
+        const frame = document.getElementById('ficha-frame');
+        if (!frame.getAttribute('src')) frame.setAttribute('src', frame.dataset.src);
+      }
     });
   });
 
@@ -734,6 +835,108 @@
       .subscribe();
   }
   loadDifficulty();
+
+  // ------------------------------------------------------------------
+  // Ajuste da PRÓXIMA rolagem (dados extras + dificuldade só daquele
+  // teste). Fica em game_state ('next_roll'); o primeiro jogador que
+  // rolar gasta o ajuste (função consume_next_roll no banco).
+  // ------------------------------------------------------------------
+  let modDice = 0;
+  let modDiff = '';        // '' = usa a dificuldade da mesa
+  let pendingMod = null;   // ajuste já enviado, ainda não gasto
+  let modWasConsumed = false;
+
+  function describeMod(m) {
+    const parts = [];
+    const e = parseInt(m.extra_dice) || 0;
+    if (e) parts.push(`${e > 0 ? '+' : ''}${e} dado(s)`);
+    if (m.difficulty) parts.push(m.difficulty === 'hard' ? 'Difícil (6)' : 'Normal (4+)');
+    return parts.join(' · ') || 'nenhum';
+  }
+
+  function renderModPanel() {
+    document.getElementById('mod-dice-value').textContent = (modDice > 0 ? '+' : '') + modDice;
+    document.querySelectorAll('#mod-widget-panel [data-mdiff]').forEach(b => {
+      b.classList.toggle('active', b.dataset.mdiff === modDiff);
+    });
+    const status = document.getElementById('mod-status');
+    if (pendingMod) status.textContent = 'Pendente: ' + describeMod(pendingMod);
+    else if (modWasConsumed) status.textContent = 'O ajuste foi gasto por um jogador.';
+    else status.textContent = 'Nenhum ajuste pendente.';
+    document.getElementById('mod-badge').classList.toggle('hidden', !pendingMod);
+  }
+
+  function setModOpen(open) {
+    document.getElementById('mod-widget-panel').classList.toggle('hidden', !open);
+    if (open) {
+      setChatOpen(false);
+      renderModPanel();
+    }
+  }
+
+  async function applyModifier() {
+    if (modDice === 0 && !modDiff) { await clearModifier(); return; }
+    const value = { extra_dice: modDice, difficulty: modDiff || null };
+    const { error } = await sb.from('game_state')
+      .upsert({ key: 'next_roll', value, updated_at: new Date().toISOString() });
+    if (error) {
+      document.getElementById('mod-status').textContent = 'Erro ao aplicar: ' + error.message;
+      return;
+    }
+    pendingMod = value;
+    modWasConsumed = false;
+    renderModPanel();
+  }
+
+  async function clearModifier() {
+    const { error } = await sb.from('game_state').delete().eq('key', 'next_roll');
+    if (error) {
+      document.getElementById('mod-status').textContent = 'Erro ao limpar: ' + error.message;
+      return;
+    }
+    pendingMod = null;
+    modWasConsumed = false;
+    modDice = 0;
+    modDiff = '';
+    renderModPanel();
+  }
+
+  document.getElementById('mod-widget-btn').addEventListener('click', () => {
+    setModOpen(document.getElementById('mod-widget-panel').classList.contains('hidden'));
+  });
+  document.getElementById('mod-widget-close').addEventListener('click', () => setModOpen(false));
+  document.getElementById('mod-dice-minus').addEventListener('click', () => { modDice = Math.max(-5, modDice - 1); renderModPanel(); });
+  document.getElementById('mod-dice-plus').addEventListener('click', () => { modDice = Math.min(10, modDice + 1); renderModPanel(); });
+  document.querySelectorAll('#mod-widget-panel [data-mdiff]').forEach(b => {
+    b.addEventListener('click', () => { modDiff = b.dataset.mdiff; renderModPanel(); });
+  });
+  document.getElementById('mod-apply-btn').addEventListener('click', applyModifier);
+  document.getElementById('mod-clear-btn').addEventListener('click', clearModifier);
+
+  async function loadNextRoll() {
+    const { data } = await sb.from('game_state').select('value').eq('key', 'next_roll').maybeSingle();
+    if (data && data.value && typeof data.value === 'object') pendingMod = data.value;
+    renderModPanel();
+
+    sb.channel('next-roll-sync-dm')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'game_state' }, (payload) => {
+        if (payload.eventType === 'DELETE') {
+          if (payload.old && payload.old.key === 'next_roll' && pendingMod) {
+            pendingMod = null;
+            modWasConsumed = true; // alguém rolou e gastou
+            modDice = 0;
+            modDiff = '';
+            renderModPanel();
+          }
+        } else if (payload.new && payload.new.key === 'next_roll') {
+          pendingMod = payload.new.value;
+          modWasConsumed = false;
+          renderModPanel();
+        }
+      })
+      .subscribe();
+  }
+  loadNextRoll();
 </script>
 
 </body>
