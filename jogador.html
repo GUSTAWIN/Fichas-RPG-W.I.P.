@@ -1061,6 +1061,31 @@
     color:var(--bone-dim);
   }
   .gate-new:hover{ border-color:var(--gold); color:var(--bone); background:transparent; }
+
+  /* ---------- Máximos travados (jogador) ---------- */
+  input:disabled{ opacity:0.55; cursor:not-allowed; }
+
+  /* ---------- Modo DM (página embutida no dm.html) ---------- */
+  body.dm-mode header,
+  body.dm-mode #area-jogo,
+  body.dm-mode #chat-widget,
+  body.dm-mode #character-gate,
+  body.dm-mode #ficha .char-select{ display:none !important; }
+  body.dm-mode main{ grid-template-columns:1fr; min-height:0; }
+  body.dm-mode.dm-no-character #ficha .tab-bar,
+  body.dm-mode.dm-no-character #ficha .tab-panel{ display:none !important; }
+  body:not(.dm-no-character) #dm-empty-msg{ display:none; }
+  #dm-character-bar{ margin-bottom:18px; }
+  .dm-bar-label{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    font-family:var(--font-mono);
+    font-size:0.7rem;
+    color:var(--bone-dim);
+    margin-bottom:12px;
+  }
+  #dm-character-select{ max-width:320px; font-size:0.95rem; padding:9px 10px; }
 </style>
 </head>
 <body>
@@ -1146,6 +1171,16 @@
 
   <section id="ficha">
     <div class="panel-label">Ficha</div>
+
+    <div id="dm-character-bar" class="hidden">
+      <label class="dm-bar-label">Personagem
+        <select id="dm-character-select"><option value="">Selecione um personagem…</option></select>
+      </label>
+      <div class="empty-state" id="dm-empty-msg">
+        Escolha um personagem para ver e editar a ficha. O que você mudar é salvo sozinho
+        e aparece pro jogador na hora (e o que o jogador mexer aparece aqui).
+      </div>
+    </div>
 
     <div class="tab-bar">
       <button class="tab-btn active" data-tab="vitais">Vitais</button>
@@ -1473,6 +1508,13 @@
   let sb = null;
   const configured = !SUPABASE_URL.includes('SEU-PROJETO');
 
+  // Modo DM: a página do DM embute esta mesma ficha com ?modo=dm. Libera os
+  // máximos de vitais, troca a tela "Quem é você?" por um seletor de personagem
+  // e desliga o resumo ao vivo (pra não criar card de ficha que ninguém usa).
+  // 'var' de propósito: é lido bem cedo (renderVitals -> pushLiveSummary).
+  var DM_MODE = new URLSearchParams(location.search).get('modo') === 'dm';
+  if (DM_MODE) document.body.classList.add('dm-mode');
+
   if (configured) {
     sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   }
@@ -1676,20 +1718,32 @@
   // Rola N d6 como TESTE: separa os sucessos (conforme a dificuldade) e, se
   // nenhum dado passar, o personagem ganha 1 Pathos automaticamente.
   // Manda o resultado pro chat compartilhado.
-  async function rollAndPost(label, count) {
-    const diff = difficultyInfo(testDifficulty);
+  async function rollAndPost(label, baseCount) {
+    // Ajuste do Mestre pra PRÓXIMA rolagem: o primeiro jogador que rolar gasta
+    // (o servidor entrega o ajuste pra um só). Se falhar, rola normal.
+    let mod = null;
+    if (configured) {
+      const { data } = await sb.rpc('consume_next_roll');
+      if (data && typeof data === 'object') mod = data;
+    }
+    const extra = mod ? (parseInt(mod.extra_dice) || 0) : 0;
+    const count = baseCount + extra;
+    const diffKey = (mod && (mod.difficulty === 'hard' || mod.difficulty === 'normal')) ? mod.difficulty : testDifficulty;
+    const diff = difficultyInfo(diffKey);
+    const modNote = mod ? ` · ajuste do Mestre${extra ? ` (${extra > 0 ? '+' : ''}${extra}d6)` : ''}` : '';
+
     let dice, formulaText, breakdown;
     if (count < 1) {
       // 0 dados: rola 2d6 e fica com o menor (só ele conta pro teste)
       const r = rollDiceFormula('2d6');
       const kept = Math.min(...r.rolls);
       dice = [kept];
-      formulaText = `${label} (0d6 → 2d6, menor)`;
+      formulaText = `${label} (0d6 → 2d6, menor)${modNote}`;
       breakdown = `[${r.rolls.join(', ')}] → ${kept}`;
     } else {
       const r = rollDiceFormula(`${count}d6`);
       dice = r.rolls;
-      formulaText = `${label} (${count}d6)`;
+      formulaText = `${label} (${count}d6)${modNote}`;
       breakdown = `[${r.rolls.join(', ')}]`;
     }
     const successes = dice.filter(d => d >= diff.min).length;
@@ -3144,11 +3198,7 @@
     currentPortraitPath = null;
     renderPortrait();
 
-    if (currentCharacterId) {
-      await persistCharacter(); // já grava o personagem sem a foto
-    } else {
-      setStatus('Foto removida.');
-    }
+    setStatus('Foto removida.'); // o autosave grava a ficha sem a foto
   });
 
   // ------------------------------------------------------------------
@@ -3168,20 +3218,9 @@
       data.map(c => `<option value="${c.id}" ${c.id === selectId ? 'selected' : ''}>${c.name}</option>`).join('');
   }
 
-  // Grava no banco de fato — sem confirmação nenhuma. Quem decide se
-  // pergunta antes é quem chama esta função.
-  async function persistCharacter() {
-    if (!configured) {
-      setStatus('Configure o Supabase no topo do arquivo primeiro.', true);
-      return false;
-    }
-    const name = document.getElementById('character-name-input').value.trim();
-    if (!name) {
-      setStatus('Dê um nome ao personagem antes de salvar.', true);
-      return false;
-    }
-
-    const sheet_data = {
+  // Monta a ficha inteira a partir do estado atual da tela
+  function collectSheetData() {
+    return {
       cat: parseInt(document.getElementById('character-cat-input').value) || 1,
       portraitUrl: currentPortraitUrl,
       portraitPath: currentPortraitPath,
@@ -3204,45 +3243,47 @@
         items: inventoryItems.map(i => ({ title: i.title, kp: i.kp, cat: i.cat, description: i.description, quantity: i.quantity ?? 1 })),
       },
     };
+  }
 
-    setStatus('Salvando...');
-    let result;
-    if (currentCharacterId) {
-      result = await sb.from('characters')
-        .update({ name, sheet_data, updated_at: new Date().toISOString() })
-        .eq('id', currentCharacterId)
-        .select()
-        .single();
-    } else {
-      result = await sb.from('characters')
-        .insert({ name, sheet_data })
-        .select()
-        .single();
+  // Cria o personagem no banco (primeiro "Salvar" de um personagem novo).
+  // Depois disso o autosave em tempo real cuida de tudo.
+  async function persistCharacter() {
+    if (!configured) {
+      setStatus('Configure o Supabase no topo do arquivo primeiro.', true);
+      return false;
     }
-
-    if (result.error) {
-      setStatus('Erro ao salvar: ' + result.error.message, true);
+    const name = document.getElementById('character-name-input').value.trim();
+    if (!name) {
+      setStatus('Dê um nome ao personagem antes de salvar.', true);
       return false;
     }
 
-    currentCharacterId = result.data.id;
+    setStatus('Salvando...');
+    const { data, error } = await sb.from('characters')
+      .insert({ name, sheet_data: collectSheetData(), last_editor: sessionEditorId })
+      .select()
+      .single();
+    if (error) {
+      setStatus('Erro ao salvar: ' + error.message, true);
+      return false;
+    }
+
+    currentCharacterId = data.id;
+    startCharacterSync(data);
     await refreshCharacterList(currentCharacterId);
-    setStatus(`"${name}" salvo.`);
+    setStatus(`"${name}" salvo — a partir de agora tudo é salvo sozinho.`);
     return true;
   }
 
-  // Botão "Salvar": se já existe um save carregado, confirma antes de
-  // sobrescrever.
+  // Botão "Salvar": personagem novo -> cria; personagem já carregado -> o
+  // autosave já grava tudo, aqui só força a gravação do que estiver pendente.
   async function saveCharacter() {
-    if (currentCharacterId) {
-      const name = document.getElementById('character-name-input').value.trim() || 'este personagem';
-      const ok = confirm(`Isso vai sobrescrever o save de "${name}". Continuar?`);
-      if (!ok) {
-        setStatus('Salvamento cancelado.');
-        return;
-      }
+    if (!currentCharacterId) {
+      await persistCharacter();
+      return;
     }
-    await persistCharacter();
+    await autosaveTick();
+    setStatus('Tudo já é salvo automaticamente.');
   }
 
   async function loadCharacter(idOverride) {
@@ -3263,6 +3304,7 @@
       return false;
     }
 
+    syncedSd = null; // pausa o autosave enquanto carrega
     currentCharacterId = data.id;
     const sd = data.sheet_data || {};
 
@@ -3322,9 +3364,235 @@
     renderVitals();
     renderPericias();
     renderProgress();
+    syncMaxInputs();
+    startCharacterSync(data);
     setStatus(`"${data.name}" carregado.`);
     return true;
   }
+
+  // ------------------------------------------------------------------
+  // Sincronização em tempo real da ficha (jogador <-> DM)
+  //
+  // - A cada segundo, compara a ficha atual com a última versão que o
+  //   servidor conhece e manda só o que mudou (função patch_character).
+  // - Escuta o personagem via Realtime: mudanças do outro lado entram na
+  //   hora, campo a campo — assim, quem edita um campo não apaga o que a
+  //   outra pessoa mexeu em outro.
+  // ------------------------------------------------------------------
+  var sessionEditorId = uid();          // identifica ESTA aba, pra ignorar o eco das próprias gravações
+  var syncedSd = null;                  // ficha que sabemos estar no servidor (+ o que já aplicamos)
+  var syncedName = '';
+  var serverSd = null;                  // último estado do servidor visto por eventos
+  var serverName = '';
+  var syncPaused = 0;
+  var syncBusy = false;
+  var syncChannel = null;
+  var remoteQueue = Promise.resolve();
+
+  function deepClone(v) { return v === undefined ? undefined : JSON.parse(JSON.stringify(v)); }
+  function isPlainObject(v) { return v !== null && typeof v === 'object' && !Array.isArray(v); }
+
+  // Lista as "folhas" que mudaram de a para b. Objetos entram recursivamente;
+  // listas e valores simples são comparados inteiros.
+  function diffLeaves(a, b, path = []) {
+    if (isPlainObject(b)) {
+      const base = isPlainObject(a) ? a : {};
+      let out = [];
+      Object.keys(b).forEach(k => { out = out.concat(diffLeaves(base[k], b[k], [...path, k])); });
+      return out;
+    }
+    return JSON.stringify(a) === JSON.stringify(b) ? [] : [{ path, value: b }];
+  }
+  function leavesToPatch(leaves) {
+    const patch = {};
+    leaves.forEach(({ path, value }) => {
+      let node = patch;
+      path.slice(0, -1).forEach(k => { node = node[k] = node[k] || {}; });
+      node[path[path.length - 1]] = value;
+    });
+    return patch;
+  }
+  function setPath(obj, path, value) {
+    let node = obj;
+    path.slice(0, -1).forEach(k => { node = node[k] = isPlainObject(node[k]) ? node[k] : {}; });
+    node[path[path.length - 1]] = value;
+  }
+  function getPath(obj, path) {
+    return path.reduce((n, k) => (n == null ? undefined : n[k]), obj);
+  }
+
+  // Os campos "Máx." mostram o valor do estado (necessário depois de carregar
+  // ou receber uma mudança, senão ficam mostrando o padrão).
+  function syncMaxInputs() {
+    const set = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
+    set('stress-max-input', vitals.stressMaxBase);
+    set('injuries-max-input', vitals.injuriesMax);
+    set('psyche-max-input', vitals.psycheMax);
+    set('agony-max-input', vitals.agonyMax);
+    set('sin-max-input', vitals.sinMaxBase);
+    set('xp-max-input', progress.xpMax);
+    set('kp-max-input', inventory.kpMax);
+  }
+
+  // Aplica na tela as mudanças que vieram do outro lado
+  async function applyRemoteLeaves(leaves) {
+    const touched = new Set();
+    const jobs = [];
+    leaves.forEach(({ path, value }) => {
+      const top = path[0];
+      const sub = path[1];
+      switch (top) {
+        case 'cat':
+          document.getElementById('character-cat-input').value = value || 1;
+          touched.add('vitals');
+          break;
+        case 'portraitUrl': currentPortraitUrl = value || null; touched.add('portrait'); break;
+        case 'portraitPath': currentPortraitPath = value || null; break;
+        case 'vitals': if (sub) { vitals[sub] = value; touched.add('vitals'); } break;
+        case 'pericias': if (sub) { pericias[sub] = value; touched.add('pericias'); } break;
+        case 'progress': if (sub) { progress[sub] = value; touched.add('progress'); } break;
+        case 'blasphemyRows': jobs.push(blasphemyPicker.setRows(value || [])); break;
+        case 'agendaRows': jobs.push(agendaPicker.setRows(value || [])); break;
+        case 'sinMarkRows': jobs.push(sinMarkPicker.setRows(value || [])); break;
+        case 'extraBoldItems':
+          extraBoldItems.length = 0;
+          extraBoldIdCounter = 0;
+          (value || []).forEach(text => extraBoldItems.push({ id: extraBoldIdCounter++, text }));
+          touched.add('extra');
+          break;
+        case 'hooks':
+          hooks.length = 0;
+          hookIdCounter = 0;
+          (value || []).forEach(h => hooks.push({ id: hookIdCounter++, text: h.text, max: h.max, filled: h.filled }));
+          touched.add('hooks');
+          break;
+        case 'afflictions': {
+          const t = document.getElementById('afflictions-title-input');
+          const x = document.getElementById('afflictions-text-input');
+          if (sub === 'title') t.value = value || '';
+          if (sub === 'text') x.value = value || '';
+          x.classList.toggle('hidden', t.value.trim() === '');
+          break;
+        }
+        case 'inventory':
+          if (sub === 'items') {
+            inventoryItems.length = 0;
+            itemIdCounter = 0;
+            (value || []).forEach(i => inventoryItems.push({
+              id: itemIdCounter++, title: i.title, kp: i.kp, cat: i.cat,
+              description: i.description || '', quantity: i.quantity ?? 1,
+            }));
+            touched.add('items');
+          } else if (sub) {
+            inventory[sub] = value;
+            touched.add('inventory');
+          }
+          break;
+      }
+    });
+
+    await Promise.all(jobs);
+
+    if (touched.has('portrait')) renderPortrait();
+    if (touched.has('pericias')) renderPericias();
+    if (touched.has('progress')) renderProgress();
+    if (touched.has('extra')) renderExtraBoldItems();
+    if (touched.has('hooks')) renderHooks();
+    if (touched.has('inventory')) {
+      document.getElementById('inventory-scripts-input').value = inventory.scripts;
+      renderInventoryResources();
+      renderScriptsOverlay();
+    }
+    if (touched.has('items')) { renderItems(); renderStoreItems(); }
+    if (touched.has('vitals')) renderVitals();
+    syncMaxInputs();
+  }
+
+  // Chega uma versão nova do personagem (evento Realtime ou "catch-up")
+  function handleRemoteRow(row, force) {
+    remoteQueue = remoteQueue.then(async () => {
+      if (!row || row.id !== currentCharacterId || !syncedSd) return;
+      if (!row.sheet_data) { // alguns eventos podem vir sem a coluna grande: busca de novo
+        const { data } = await sb.from('characters').select('*').eq('id', row.id).single();
+        if (!data) return;
+        row = data;
+      }
+      const prevSd = serverSd || {};
+      const prevName = serverName;
+      serverSd = row.sheet_data || {};
+      serverName = row.name || '';
+      if (!force && row.last_editor === sessionEditorId) return; // eco da nossa própria gravação
+
+      const leaves = diffLeaves(prevSd, serverSd);
+      const nameChanged = serverName !== prevName;
+      if (!leaves.length && !nameChanged) return;
+
+      syncPaused++;
+      try {
+        if (nameChanged) {
+          document.getElementById('character-name-input').value = serverName;
+          syncedName = serverName;
+        }
+        if (leaves.length) {
+          await applyRemoteLeaves(leaves);
+          // marca como "já no servidor" o que acabamos de receber (no formato local)
+          const cur = collectSheetData();
+          leaves.forEach(l => setPath(syncedSd, l.path, deepClone(getPath(cur, l.path))));
+        }
+      } finally {
+        syncPaused--;
+      }
+    });
+  }
+
+  function startCharacterSync(row) {
+    if (syncChannel) { sb.removeChannel(syncChannel); syncChannel = null; }
+    serverSd = row.sheet_data || {};
+    serverName = row.name || '';
+    syncedSd = deepClone(collectSheetData());
+    syncedName = (document.getElementById('character-name-input').value || '').trim();
+    syncChannel = sb.channel('char-sync-' + row.id)
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'characters', filter: `id=eq.${row.id}` },
+        (payload) => handleRemoteRow(payload.new, false))
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          // pega o que possa ter mudado enquanto a assinatura abria
+          const { data } = await sb.from('characters').select('*').eq('id', row.id).single();
+          if (data) handleRemoteRow(data, true);
+        }
+      });
+  }
+
+  // Autosave: manda pro servidor só o que mudou desde a última sincronização
+  async function autosaveTick() {
+    if (!configured || !currentCharacterId || !syncedSd || syncPaused > 0 || syncBusy) return;
+    const idAtStart = currentCharacterId;
+    const nowSd = collectSheetData();
+    const name = document.getElementById('character-name-input').value.trim();
+    const leaves = diffLeaves(syncedSd, nowSd);
+    const nameChanged = !!name && name !== syncedName;
+    if (!leaves.length && !nameChanged) return;
+
+    syncBusy = true;
+    try {
+      const { error } = await sb.rpc('patch_character', {
+        p_id: idAtStart,
+        p_patch: leavesToPatch(leaves),
+        p_name: nameChanged ? name : null,
+        p_editor: sessionEditorId,
+      });
+      if (error) {
+        setStatus('Erro no autosave: ' + error.message, true);
+      } else if (idAtStart === currentCharacterId && syncedSd) {
+        leaves.forEach(l => setPath(syncedSd, l.path, deepClone(l.value)));
+        if (nameChanged) syncedName = name;
+      }
+    } finally {
+      syncBusy = false;
+    }
+  }
+  setInterval(autosaveTick, 1000);
 
   document.getElementById('save-character').addEventListener('click', saveCharacter);
   document.getElementById('load-character').addEventListener('click', () => loadCharacter());
@@ -3384,7 +3652,7 @@
     });
   }
 
-  showCharacterGate();
+  if (!DM_MODE) showCharacterGate();
 
   // ------------------------------------------------------------------
   // Fichas ao Vivo — autosave contínuo (resumo rápido) numa tabela com
@@ -3411,7 +3679,7 @@
                                  // já que pushLiveSummary() é chamada por renderVitals()
                                  // bem antes desta linha ser alcançada na primeira execução.
   function pushLiveSummary() {
-    if (!configured) return;
+    if (!configured || DM_MODE) return;
     clearTimeout(liveSummaryTimer);
     liveSummaryTimer = setTimeout(async () => {
       const name = document.getElementById('character-name-input').value.trim();
@@ -3476,6 +3744,47 @@
       .subscribe();
   }
   loadDifficulty();
+
+  // ------------------------------------------------------------------
+  // Máximos de vitais: só o Mestre altera. No jogador os campos ficam
+  // travados (mostram o valor, mas não editam). Trava só visual: sem
+  // login, não dá pra impedir de verdade.
+  // ------------------------------------------------------------------
+  if (!DM_MODE) {
+    ['stress-max-input', 'injuries-max-input', 'psyche-max-input', 'agony-max-input', 'sin-max-input']
+      .forEach(id => {
+        const el = document.getElementById(id);
+        el.disabled = true;
+        el.title = 'Só o Mestre pode alterar o máximo';
+      });
+  }
+
+  // ------------------------------------------------------------------
+  // Modo DM: seletor de personagem no lugar da tela "Quem é você?"
+  // ------------------------------------------------------------------
+  if (DM_MODE) {
+    document.body.classList.add('dm-no-character');
+    document.getElementById('dm-character-bar').classList.remove('hidden');
+    const dmSelect = document.getElementById('dm-character-select');
+
+    async function refreshDmList() {
+      if (!configured) return;
+      const { data, error } = await sb.from('characters').select('id, name').order('name');
+      if (error) { setStatus('Erro ao listar personagens: ' + error.message, true); return; }
+      const current = dmSelect.value;
+      dmSelect.innerHTML = '<option value="">Selecione um personagem…</option>' +
+        data.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('');
+      dmSelect.value = current;
+    }
+
+    dmSelect.addEventListener('focus', refreshDmList); // pega personagens criados depois
+    dmSelect.addEventListener('change', async () => {
+      if (!dmSelect.value) return;
+      const ok = await loadCharacter(dmSelect.value);
+      if (ok) document.body.classList.remove('dm-no-character');
+    });
+    refreshDmList();
+  }
 </script>
 
 </body>
