@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>CAIN — DEV</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#14110F; --bg-raised:#1B1714; --line:#33291F;
+    --bone:#E7DFCF; --bone-dim:#A79C89;
+    --blood:#8C2A22; --blood-bright:#C6401F; --gold:#AE8A4E;
+    --font-display:'Cinzel',serif; --font-body:'Inter',sans-serif; --font-mono:'JetBrains Mono',monospace;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; background:var(--bg); color:var(--bone); font-family:var(--font-body); }
+  body{ min-height:100vh; }
+  .hidden{ display:none !important; }
+
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    height:78px; padding:0 clamp(16px,4vw,48px);
+    border-bottom:1px solid var(--line);
+    position:sticky; top:0; z-index:10; background:var(--bg);
+  }
+  header h1{ font-family:var(--font-display); font-weight:700; letter-spacing:0.04em; font-size:1.5rem; margin:0; }
+  header h1 span{ color:var(--blood-bright); }
+  .header-right{ display:flex; align-items:center; gap:14px; font-family:var(--font-mono); font-size:0.75rem; color:var(--bone-dim); }
+  .back-link{ color:var(--gold); text-decoration:none; }
+  .back-link:hover{ text-decoration:underline; }
+
+  button{
+    background:var(--bg-raised); color:var(--bone); border:1px solid var(--line);
+    font-family:var(--font-body); font-size:0.85rem; padding:8px 12px; border-radius:2px; cursor:pointer;
+  }
+  button:hover{ background:var(--blood); }
+  input, select, textarea{
+    width:100%; background:var(--bg); border:1px solid var(--line); color:var(--bone);
+    font-family:var(--font-body); font-size:0.9rem; padding:8px 10px; border-radius:2px;
+  }
+  input:focus, select:focus, textarea:focus{ outline:1px solid var(--gold); }
+  input[type="checkbox"]{ width:auto; accent-color:var(--gold); }
+  input[type="color"]{ height:38px; padding:2px; }
+  textarea{ min-height:110px; resize:vertical; line-height:1.5; }
+
+  /* Login */
+  #gate{
+    position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center;
+    padding:20px; background:var(--bg);
+  }
+  .gate-card{ width:100%; max-width:360px; background:var(--bg-raised); border:1px solid var(--gold); border-radius:6px; padding:24px; }
+  .gate-card h2{ font-family:var(--font-display); margin:0 0 14px; }
+  .gate-card button{ margin-top:12px; width:100%; }
+  #gate-status{ font-family:var(--font-mono); font-size:0.75rem; color:var(--blood-bright); margin-top:10px; min-height:1em; }
+
+  main{ padding:18px clamp(16px,4vw,48px) 60px; max-width:1100px; margin:0 auto; }
+  .tab-bar{ display:flex; gap:22px; flex-wrap:wrap; border-bottom:1px solid var(--line); margin-bottom:20px; }
+  .tab-btn{
+    background:transparent; border:none; border-bottom:2px solid transparent; color:var(--bone-dim);
+    font-family:var(--font-display); font-size:1rem; font-weight:600; padding:6px 2px 10px; border-radius:0;
+  }
+  .tab-btn:hover{ background:transparent; color:var(--bone); }
+  .tab-btn.active{ color:var(--bone); border-bottom-color:var(--blood-bright); }
+  .tab-panel{ display:none; }
+  .tab-panel.active{ display:block; }
+
+  h3{ font-family:var(--font-display); font-size:1.05rem; margin:26px 0 12px; }
+  .toolbar{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:18px; }
+  .toolbar label{ display:flex; flex-direction:column; gap:5px; min-width:200px; flex:1; max-width:320px; }
+  .dev-label{ font-family:var(--font-mono); font-size:0.68rem; color:var(--bone-dim); }
+
+  .dev-card{ background:var(--bg-raised); border:1px solid var(--line); border-radius:3px; padding:16px; margin-bottom:14px; }
+  .dev-card-title{ font-weight:600; margin-bottom:4px; }
+  .dev-note{ font-family:var(--font-mono); font-size:0.68rem; color:var(--bone-dim); margin-bottom:10px; }
+  .dev-fields{ display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; margin-top:10px; }
+  .dev-field{ display:flex; flex-direction:column; gap:5px; }
+  .dev-field.wide{ grid-column:1 / -1; }
+  .dev-preview{ max-height:140px; max-width:100%; object-fit:contain; margin-top:8px; border-radius:3px; align-self:flex-start; }
+  .dev-actions{ display:flex; align-items:center; gap:10px; margin-top:14px; }
+  .dev-status{ font-family:var(--font-mono); font-size:0.72rem; color:var(--gold); }
+  .dev-status.error{ color:var(--blood-bright); }
+  .dev-delete{ margin-left:auto; border-color:var(--blood); color:var(--blood-bright); }
+  details.dev-create{ background:var(--bg-raised); border:1px dashed var(--line); border-radius:3px; padding:12px 16px; margin:16px 0; }
+  details.dev-create summary{ cursor:pointer; color:var(--gold); font-weight:600; }
+  .empty{ color:var(--bone-dim); font-size:0.9rem; }
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="gate-card">
+    <h2>DEV</h2>
+    <input type="password" id="gate-password" placeholder="Senha" autocomplete="current-password">
+    <button type="button" id="gate-btn">Entrar</button>
+    <div id="gate-status"></div>
+  </div>
+</div>
+
+<header>
+  <h1>CAIN <span>//</span> DEV</h1>
+  <div class="header-right">
+    <a href="index.html" class="back-link">início</a>
+    <button type="button" id="logout-btn">Sair</button>
+  </div>
+</header>
+
+<main id="app" class="hidden">
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="blasfemias">Blasfêmias</button>
+    <button class="tab-btn" data-tab="agendas">Agendas</button>
+    <button class="tab-btn" data-tab="loja">Itens da Loja</button>
+    <button class="tab-btn" data-tab="sinmarks">Sin Marks</button>
+  </div>
+  <div class="tab-panel active" id="panel-blasfemias"></div>
+  <div class="tab-panel" id="panel-agendas"></div>
+  <div class="tab-panel" id="panel-loja"></div>
+  <div class="tab-panel" id="panel-sinmarks"></div>
+</main>
+
+<script>
+  const SUPABASE_URL = "https://wsivcnbzgahfkvqtozwn.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndzaXZjbmJ6Z2FoZmt2cXRvenduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxMDI3NzMsImV4cCI6MjEwNTY3ODc3M30.l6YyRbZJ_1fJ5o-LImW6bFnFhd_DvJWD5jUfBUowCJo";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const $ = (id) => document.getElementById(id);
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  // ------------------------------------------------------------------
+  // Senha: conferida NO SERVIDOR (funções dev_* do banco). Fica só na
+  // sessionStorage desta aba — fechou a aba, pede de novo.
+  // ------------------------------------------------------------------
+  let devPassword = sessionStorage.getItem('cain_dev_pw') || '';
+
+  async function rpc(fn, args) {
+    const { data, error } = await sb.rpc(fn, { p_password: devPassword, ...args });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  // ------------------------------------------------------------------
+  // Dados e esquemas de edição
+  // ------------------------------------------------------------------
+  const data = {
+    blasphemies: [], blasphemy_abilities: [], agendas: [], agenda_abilities: [],
+    items: [], sin_marks: [], sin_mark_locations: [],
+  };
+  const CATEGORIES = ['Aesthetics', 'Possessions', 'Comfort / Career', 'Occult / Medical'];
+  const PURCHASE_TYPES = ['single', 'consumable'];
+
+  // Os NOMES não são editáveis aqui (outras tabelas e as fichas se ligam por nome).
+  const SCHEMAS = {
+    blasphemies: {
+      pk: 'name',
+      fields: [
+        { key: 'description', label: 'Descrição', type: 'textarea', required: true, wide: true },
+        { key: 'color_hex', label: 'Cor', type: 'color', required: true },
+        { key: 'image_url', label: 'Imagem (URL pública)', type: 'text', wide: true, preview: true },
+        { key: 'passive_name', label: 'Nome da passiva', type: 'text', wide: true },
+        { key: 'passive_description', label: 'Passiva', type: 'textarea', wide: true },
+      ],
+    },
+    blasphemy_abilities: {
+      pk: 'id', deletable: true,
+      fields: [
+        { key: 'tags', label: 'Tags (verbo, duração, alcance)', type: 'text', wide: true },
+        { key: 'explosion_cost', label: 'Custo de Explosões', type: 'number' },
+        { key: 'ability', label: 'Texto', type: 'textarea', required: true, wide: true },
+      ],
+      create: [
+        { key: 'name', label: 'Nome', type: 'text', required: true, wide: true },
+        { key: 'tags', label: 'Tags', type: 'text', wide: true },
+        { key: 'explosion_cost', label: 'Custo de Explosões', type: 'number' },
+        { key: 'is_passive', label: 'É a passiva?', type: 'checkbox' },
+        { key: 'ability', label: 'Texto', type: 'textarea', required: true, wide: true },
+      ],
+    },
+    agendas: {
+      pk: 'name',
+      fields: [
+        { key: 'normal_item', label: 'Item normal', type: 'text', wide: true },
+        { key: 'bolded_item', label: 'Item em negrito', type: 'text', wide: true },
+      ],
+    },
+    agenda_abilities: {
+      pk: 'id', deletable: true,
+      fields: [{ key: 'ability', label: 'Texto', type: 'textarea', required: true, wide: true }],
+      create: [
+        { key: 'name', label: 'Nome', type: 'text', required: true, wide: true },
+        { key: 'ability', label: 'Texto', type: 'textarea', required: true, wide: true },
+      ],
+    },
+    items: {
+      pk: 'id', deletable: true,
+      fields: [
+        { key: 'category', label: 'Categoria (vazio = fora da loja)', type: 'select', options: CATEGORIES },
+        { key: 'purchase_type', label: 'Tipo de compra', type: 'select', options: PURCHASE_TYPES },
+        { key: 'scrip', label: 'Custo (Scrip)', type: 'number' },
+        { key: 'kp', label: 'KP por uso', type: 'number' },
+        { key: 'cat_requirement', label: 'CAT mínimo', type: 'number' },
+        { key: 'kit', label: 'Kit', type: 'text' },
+        { key: 'condition', label: 'Condição', type: 'text' },
+        { key: 'description', label: 'Descrição', type: 'textarea', wide: true },
+      ],
+      create: [
+        { key: 'name', label: 'Nome', type: 'text', required: true, wide: true },
+        { key: 'category', label: 'Categoria', type: 'select', options: CATEGORIES },
+        { key: 'purchase_type', label: 'Tipo de compra', type: 'select', options: PURCHASE_TYPES },
+        { key: 'scrip', label: 'Custo (Scrip)', type: 'number' },
+        { key: 'kp', label: 'KP por uso', type: 'number' },
+        { key: 'cat_requirement', label: 'CAT mínimo', type: 'number' },
+        { key: 'kit', label: 'Kit', type: 'text' },
+        { key: 'condition', label: 'Condição', type: 'text' },
+        { key: 'description', label: 'Descrição', type: 'textarea', wide: true },
+      ],
+    },
+    sin_marks: {
+      pk: 'id', deletable: true,
+      fields: [
+        { key: 'verb', label: 'Verbo', type: 'text' },
+        { key: 'duration', label: 'Duração', type: 'text' },
+        { key: 'range', label: 'Alcance', type: 'text' },
+        { key: 'summary', label: 'Resumo', type: 'text', wide: true },
+        { key: 'ability', label: 'Texto', type: 'textarea', required: true, wide: true },
+      ],
+      create: [
+        { key: 'location', label: 'Localização', type: 'select', required: true, options: [] },
+        { key: 'mark_level', label: 'Nível', type: 'number', required: true },
+        { key: 'name', label: 'Nome (vazio = "Localização Nível")', type: 'text', wide: true },
+        { key: 'verb', label: 'Verbo', type: 'text' },
+        { key: 'duration', label: 'Duração', type: 'text' },
+        { key: 'range', label: 'Alcance', type: 'text' },
+        { key: 'summary', label: 'Resumo', type: 'text', wide: true },
+        { key: 'ability', label: 'Texto', type: 'textarea', required: true, wide: true },
+      ],
+    },
+  };
+
+  // ------------------------------------------------------------------
+  // Campos, cartões e formulários de criação
+  // ------------------------------------------------------------------
+  function buildField(f, value) {
+    const wrap = el('label', 'dev-field' + (f.wide ? ' wide' : ''));
+    wrap.appendChild(el('span', 'dev-label', f.label));
+    let input;
+    if (f.type === 'textarea') {
+      input = el('textarea');
+      input.value = value ?? '';
+    } else if (f.type === 'select') {
+      input = el('select');
+      ['', ...f.options].forEach(o => {
+        const op = el('option', null, o || '—');
+        op.value = o;
+        input.appendChild(op);
+      });
+      input.value = value ?? '';
+    } else if (f.type === 'checkbox') {
+      input = el('input');
+      input.type = 'checkbox';
+      input.checked = !!value;
+    } else {
+      input = el('input');
+      input.type = f.type === 'number' ? 'number' : (f.type === 'color' ? 'color' : 'text');
+      if (f.type === 'number') input.step = 'any';
+      input.value = value ?? (f.type === 'color' ? '#888888' : '');
+    }
+    wrap.appendChild(input);
+    return { wrap, input };
+  }
+
+  function readValue(f, input) {
+    if (f.type === 'checkbox') return input.checked;
+    if (f.type === 'number') return input.value === '' ? null : Number(input.value);
+    const v = input.value;
+    if (f.type === 'color') return v.toUpperCase();
+    return (v === '' && !f.required) ? null : v;
+  }
+
+  function normalizeOriginal(f, v) {
+    if (f.type === 'checkbox') return !!v;
+    if (f.type === 'color') return (v || '').toUpperCase();
+    if (v === undefined || v === null || v === '') return f.required ? '' : null;
+    return v;
+  }
+
+  function setStatus(node, msg, isError) {
+    node.textContent = msg;
+    node.classList.toggle('error', !!isError);
+  }
+
+  function addPreview(wrap, input) {
+    const img = el('img', 'dev-preview');
+    img.alt = '';
+    const update = () => { img.style.display = input.value ? 'block' : 'none'; img.src = input.value; };
+    img.addEventListener('error', () => { img.style.display = 'none'; });
+    input.addEventListener('input', update);
+    update();
+    wrap.appendChild(img);
+  }
+
+  function buildCard(table, row, title, note, onDeleted) {
+    const schema = SCHEMAS[table];
+    const card = el('div', 'dev-card');
+    card.appendChild(el('div', 'dev-card-title', title));
+    if (note) card.appendChild(el('div', 'dev-note', note));
+
+    const grid = el('div', 'dev-fields');
+    const inputs = {};
+    schema.fields.forEach(f => {
+      const { wrap, input } = buildField(f, row[f.key]);
+      inputs[f.key] = input;
+      if (f.preview) addPreview(wrap, input);
+      grid.appendChild(wrap);
+    });
+    card.appendChild(grid);
+
+    const actions = el('div', 'dev-actions');
+    const status = el('span', 'dev-status');
+    const save = el('button', null, 'Salvar');
+    save.addEventListener('click', async () => {
+      const values = {};
+      schema.fields.forEach(f => {
+        const cur = readValue(f, inputs[f.key]);
+        if (JSON.stringify(cur) !== JSON.stringify(normalizeOriginal(f, row[f.key]))) values[f.key] = cur;
+      });
+      if (!Object.keys(values).length) { setStatus(status, 'Sem alterações.'); return; }
+      setStatus(status, 'Salvando...');
+      try {
+        const n = await rpc('dev_update', { p_table: table, p_key: String(row[schema.pk]), p_values: values });
+        if (!n) throw new Error('Nenhuma linha foi alterada.');
+        Object.assign(row, values);
+        setStatus(status, 'Salvo ✓');
+      } catch (e) {
+        setStatus(status, e.message, true);
+      }
+    });
+    actions.appendChild(save);
+    actions.appendChild(status);
+
+    if (schema.deletable) {
+      const del = el('button', 'dev-delete', 'Excluir');
+      del.addEventListener('click', async () => {
+        if (!confirm(`Excluir "${title}"? Isso não dá pra desfazer.`)) return;
+        setStatus(status, 'Excluindo...');
+        try {
+          await rpc('dev_delete', { p_table: table, p_key: String(row[schema.pk]) });
+          data[table] = data[table].filter(r => r !== row);
+          card.remove();
+          if (onDeleted) onDeleted();
+        } catch (e) {
+          setStatus(status, e.message, true);
+        }
+      });
+      actions.appendChild(del);
+    }
+    card.appendChild(actions);
+    return card;
+  }
+
+  function buildCreateForm(table, fixed, onCreated, label) {
+    const schema = SCHEMAS[table];
+    const details = el('details', 'dev-create');
+    details.appendChild(el('summary', null, label));
+
+    const grid = el('div', 'dev-fields');
+    const inputs = {};
+    schema.create.forEach(f => {
+      const { wrap, input } = buildField(f, null);
+      inputs[f.key] = input;
+      grid.appendChild(wrap);
+    });
+    details.appendChild(grid);
+
+    const actions = el('div', 'dev-actions');
+    const status = el('span', 'dev-status');
+    const btn = el('button', null, 'Criar');
+    btn.addEventListener('click', async () => {
+      const values = { ...fixed };
+      for (const f of schema.create) {
+        const v = readValue(f, inputs[f.key]);
+        if (f.required && (v === '' || v === null)) { setStatus(status, `Preencha: ${f.label}`, true); return; }
+        if (f.type === 'checkbox' || (v !== null && v !== '')) values[f.key] = v;
+      }
+      if (table === 'sin_marks' && !values.name) values.name = `${values.location} ${values.mark_level}`;
+      setStatus(status, 'Criando...');
+      try {
+        const row = await rpc('dev_insert', { p_table: table, p_values: values });
+        data[table].push(row);
+        onCreated();
+      } catch (e) {
+        setStatus(status, e.message, true);
+      }
+    });
+    actions.appendChild(btn);
+    actions.appendChild(status);
+    details.appendChild(actions);
+    return details;
+  }
+
+  function buildSelect(labelText, options, value, onChange) {
+    const label = el('label');
+    label.appendChild(el('span', 'dev-label', labelText));
+    const sel = el('select');
+    options.forEach(([val, text]) => {
+      const op = el('option', null, text);
+      op.value = val;
+      sel.appendChild(op);
+    });
+    sel.value = value;
+    sel.addEventListener('change', () => onChange(sel.value));
+    label.appendChild(sel);
+    return label;
+  }
+
+  const byName = (a, b) => String(a.name).localeCompare(String(b.name), 'pt-BR');
+  const state = { blasphemy: '', agenda: '', lojaCategory: '', lojaSearch: '' };
+
+  // ------------------------------------------------------------------
+  // Abas
+  // ------------------------------------------------------------------
+  function renderBlasphemies() {
+    const root = $('panel-blasfemias');
+    root.innerHTML = '';
+    const list = data.blasphemies.slice().sort(byName);
+    if (!list.length) { root.appendChild(el('div', 'empty', 'Nenhuma blasfêmia.')); return; }
+    if (!list.some(b => b.name === state.blasphemy)) state.blasphemy = list[0].name;
+
+    const bar = el('div', 'toolbar');
+    bar.appendChild(buildSelect('Blasfêmia', list.map(b => [b.name, b.name]), state.blasphemy, (v) => {
+      state.blasphemy = v;
+      renderBlasphemies();
+    }));
+    root.appendChild(bar);
+
+    const b = list.find(x => x.name === state.blasphemy);
+    root.appendChild(buildCard('blasphemies', b, b.name, 'O nome não pode ser alterado aqui. Pra trocar a imagem: suba o arquivo no Storage (bucket blasphemy-images) e cole a URL pública.'));
+
+    root.appendChild(el('h3', null, 'Habilidades'));
+    data.blasphemy_abilities
+      .filter(a => a.blasphemy === b.name)
+      .sort((x, y) => (Number(y.is_passive) - Number(x.is_passive)) || (x.id - y.id))
+      .forEach(a => root.appendChild(buildCard('blasphemy_abilities', a, a.name + (a.is_passive ? ' · passiva' : ''), null)));
+    root.appendChild(buildCreateForm('blasphemy_abilities', { blasphemy: b.name }, renderBlasphemies, '+ Nova habilidade'));
+  }
+
+  function renderAgendas() {
+    const root = $('panel-agendas');
+    root.innerHTML = '';
+    const list = data.agendas.slice().sort(byName);
+    if (!list.length) { root.appendChild(el('div', 'empty', 'Nenhuma agenda.')); return; }
+    if (!list.some(a => a.name === state.agenda)) state.agenda = list[0].name;
+
+    const bar = el('div', 'toolbar');
+    bar.appendChild(buildSelect('Agenda', list.map(a => [a.name, a.name]), state.agenda, (v) => {
+      state.agenda = v;
+      renderAgendas();
+    }));
+    root.appendChild(bar);
+
+    const a = list.find(x => x.name === state.agenda);
+    root.appendChild(buildCard('agendas', a, a.name, 'O nome não pode ser alterado aqui.'));
+
+    root.appendChild(el('h3', null, 'Habilidades'));
+    data.agenda_abilities
+      .filter(x => x.agenda === a.name)
+      .sort((x, y) => x.id - y.id)
+      .forEach(x => root.appendChild(buildCard('agenda_abilities', x, x.name, null)));
+    root.appendChild(buildCreateForm('agenda_abilities', { agenda: a.name }, renderAgendas, '+ Nova habilidade'));
+  }
+
+  function renderLoja() {
+    const root = $('panel-loja');
+    root.innerHTML = '';
+
+    const bar = el('div', 'toolbar');
+    bar.appendChild(buildSelect('Categoria',
+      [['', 'Todas'], ...CATEGORIES.map(c => [c, c]), ['__none', 'Sem categoria (fora da loja)']],
+      state.lojaCategory, (v) => { state.lojaCategory = v; fillList(); }));
+    const searchLabel = el('label');
+    searchLabel.appendChild(el('span', 'dev-label', 'Buscar por nome'));
+    const search = el('input');
+    search.type = 'text';
+    search.value = state.lojaSearch;
+    search.addEventListener('input', () => { state.lojaSearch = search.value; fillList(); });
+    searchLabel.appendChild(search);
+    bar.appendChild(searchLabel);
+    root.appendChild(bar);
+
+    const listBox = el('div');
+    root.appendChild(listBox);
+    root.appendChild(buildCreateForm('items', {}, renderLoja, '+ Novo item'));
+
+    function fillList() {
+      listBox.innerHTML = '';
+      const q = state.lojaSearch.trim().toLowerCase();
+      const items = data.items
+        .filter(i => state.lojaCategory === '' ? true
+          : state.lojaCategory === '__none' ? !i.category : i.category === state.lojaCategory)
+        .filter(i => !q || String(i.name).toLowerCase().includes(q))
+        .sort((a, b) => String(a.category || 'zzz').localeCompare(String(b.category || 'zzz')) || byName(a, b));
+      if (!items.length) { listBox.appendChild(el('div', 'empty', 'Nenhum item.')); return; }
+      items.forEach(i => listBox.appendChild(buildCard('items', i, i.name,
+        i.category ? i.category : 'Sem categoria — não aparece na loja')));
+    }
+    fillList();
+  }
+
+  function renderSinMarks() {
+    const root = $('panel-sinmarks');
+    root.innerHTML = '';
+    const locations = data.sin_mark_locations.map(l => l.name).sort();
+    SCHEMAS.sin_marks.create.find(f => f.key === 'location').options = locations;
+
+    locations.forEach(loc => {
+      root.appendChild(el('h3', null, loc));
+      data.sin_marks
+        .filter(m => m.location === loc)
+        .sort((a, b) => (a.mark_level - b.mark_level) || (a.id - b.id))
+        .forEach(m => root.appendChild(buildCard('sin_marks', m, m.name, null)));
+    });
+    root.appendChild(buildCreateForm('sin_marks', {}, renderSinMarks, '+ Novo Sin Mark'));
+  }
+
+  const RENDERERS = { blasfemias: renderBlasphemies, agendas: renderAgendas, loja: renderLoja, sinmarks: renderSinMarks };
+
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      $('panel-' + btn.dataset.tab).classList.add('active');
+      RENDERERS[btn.dataset.tab]();
+    });
+  });
+
+  // ------------------------------------------------------------------
+  // Entrada / carregamento
+  // ------------------------------------------------------------------
+  async function loadAll() {
+    const tables = Object.keys(data);
+    const results = await Promise.all(tables.map(t => sb.from(t).select('*')));
+    const failed = results.findIndex(r => r.error);
+    if (failed !== -1) throw new Error(`${tables[failed]}: ${results[failed].error.message}`);
+    tables.forEach((t, i) => { data[t] = results[i].data; });
+  }
+
+  async function enter() {
+    $('gate-status').textContent = 'Carregando...';
+    try {
+      await loadAll();
+    } catch (e) {
+      $('gate-status').textContent = 'Erro ao carregar os dados: ' + e.message;
+      return;
+    }
+    $('gate').classList.add('hidden');
+    $('app').classList.remove('hidden');
+    renderBlasphemies();
+  }
+
+  async function tryLogin(password) {
+    devPassword = password;
+    $('gate-status').textContent = 'Conferindo...';
+    try {
+      await rpc('dev_check', {});
+      sessionStorage.setItem('cain_dev_pw', password);
+      await enter();
+    } catch (e) {
+      devPassword = '';
+      sessionStorage.removeItem('cain_dev_pw');
+      $('gate-status').textContent = e.message.includes('Senha') ? 'Senha incorreta.' : 'Erro: ' + e.message;
+    }
+  }
+
+  $('gate-btn').addEventListener('click', () => tryLogin($('gate-password').value));
+  $('gate-password').addEventListener('keydown', (e) => { if (e.key === 'Enter') tryLogin($('gate-password').value); });
+  $('logout-btn').addEventListener('click', () => {
+    sessionStorage.removeItem('cain_dev_pw');
+    location.reload();
+  });
+
+  if (devPassword) tryLogin(devPassword);
+</script>
+
+</body>
+</html>
