@@ -156,11 +156,13 @@
   const CATEGORIES = ['Aesthetics', 'Possessions', 'Comfort / Career', 'Occult / Medical'];
   const PURCHASE_TYPES = ['single', 'consumable'];
 
-  // Os NOMES não são editáveis aqui (outras tabelas e as fichas se ligam por nome).
+  // Cada linha tem uma chave: "id" (pais e itens) ou "idDoPai-número" (habilidades).
+  // Como tudo se liga por ID, os NOMES podem ser editados à vontade.
   const SCHEMAS = {
     blasphemies: {
-      pk: 'name',
+      pk: ['id'], deletable: true,
       fields: [
+        { key: 'name', label: 'Nome', type: 'text', required: true, wide: true },
         { key: 'description', label: 'Descrição', type: 'textarea', required: true, wide: true },
         { key: 'color_hex', label: 'Cor', type: 'color', required: true },
         { key: 'image_url', label: 'Imagem (URL pública)', type: 'text', wide: true, preview: true },
@@ -169,38 +171,34 @@
       ],
     },
     blasphemy_abilities: {
-      pk: 'id', deletable: true,
+      pk: ['blasphemy_id', 'number'], deletable: true,
       fields: [
-        { key: 'tags', label: 'Tags (verbo, duração, alcance)', type: 'text', wide: true },
-        { key: 'explosion_cost', label: 'Custo de Explosões', type: 'number' },
-        { key: 'ability', label: 'Texto', type: 'textarea', required: true, wide: true },
-      ],
-      create: [
         { key: 'name', label: 'Nome', type: 'text', required: true, wide: true },
-        { key: 'tags', label: 'Tags', type: 'text', wide: true },
+        { key: 'tags', label: 'Tags (verbo, duração, alcance)', type: 'text', wide: true },
         { key: 'explosion_cost', label: 'Custo de Explosões', type: 'number' },
         { key: 'is_passive', label: 'É a passiva?', type: 'checkbox' },
         { key: 'ability', label: 'Texto', type: 'textarea', required: true, wide: true },
       ],
     },
     agendas: {
-      pk: 'name',
+      pk: ['id'], deletable: true,
       fields: [
+        { key: 'name', label: 'Nome', type: 'text', required: true, wide: true },
         { key: 'normal_item', label: 'Item normal', type: 'text', wide: true },
         { key: 'bolded_item', label: 'Item em negrito', type: 'text', wide: true },
       ],
     },
     agenda_abilities: {
-      pk: 'id', deletable: true,
-      fields: [{ key: 'ability', label: 'Texto', type: 'textarea', required: true, wide: true }],
-      create: [
+      pk: ['agenda_id', 'number'], deletable: true,
+      fields: [
         { key: 'name', label: 'Nome', type: 'text', required: true, wide: true },
         { key: 'ability', label: 'Texto', type: 'textarea', required: true, wide: true },
       ],
     },
     items: {
-      pk: 'id', deletable: true,
+      pk: ['id'], deletable: true,
       fields: [
+        { key: 'name', label: 'Nome', type: 'text', required: true, wide: true },
         { key: 'category', label: 'Categoria (vazio = fora da loja)', type: 'select', options: CATEGORIES },
         { key: 'purchase_type', label: 'Tipo de compra', type: 'select', options: PURCHASE_TYPES },
         { key: 'scrip', label: 'Custo (Scrip)', type: 'number' },
@@ -210,31 +208,16 @@
         { key: 'condition', label: 'Condição', type: 'text' },
         { key: 'description', label: 'Descrição', type: 'textarea', wide: true },
       ],
-      create: [
-        { key: 'name', label: 'Nome', type: 'text', required: true, wide: true },
-        { key: 'category', label: 'Categoria', type: 'select', options: CATEGORIES },
-        { key: 'purchase_type', label: 'Tipo de compra', type: 'select', options: PURCHASE_TYPES },
-        { key: 'scrip', label: 'Custo (Scrip)', type: 'number' },
-        { key: 'kp', label: 'KP por uso', type: 'number' },
-        { key: 'cat_requirement', label: 'CAT mínimo', type: 'number' },
-        { key: 'kit', label: 'Kit', type: 'text' },
-        { key: 'condition', label: 'Condição', type: 'text' },
-        { key: 'description', label: 'Descrição', type: 'textarea', wide: true },
-      ],
+    },
+    sin_mark_locations: {
+      pk: ['id'], deletable: true,
+      fields: [{ key: 'name', label: 'Nome da localização', type: 'text', required: true, wide: true }],
     },
     sin_marks: {
-      pk: 'id', deletable: true,
+      pk: ['location_id', 'number'], deletable: true,
       fields: [
-        { key: 'verb', label: 'Verbo', type: 'text' },
-        { key: 'duration', label: 'Duração', type: 'text' },
-        { key: 'range', label: 'Alcance', type: 'text' },
-        { key: 'summary', label: 'Resumo', type: 'text', wide: true },
-        { key: 'ability', label: 'Texto', type: 'textarea', required: true, wide: true },
-      ],
-      create: [
-        { key: 'location', label: 'Localização', type: 'select', required: true, options: [] },
-        { key: 'mark_level', label: 'Nível', type: 'number', required: true },
-        { key: 'name', label: 'Nome (vazio = "Localização Nível")', type: 'text', wide: true },
+        { key: 'name', label: 'Nome', type: 'text', required: true },
+        { key: 'mark_level', label: 'Nível', type: 'number' },
         { key: 'verb', label: 'Verbo', type: 'text' },
         { key: 'duration', label: 'Duração', type: 'text' },
         { key: 'range', label: 'Alcance', type: 'text' },
@@ -243,6 +226,17 @@
       ],
     },
   };
+  // Formulário de criação = os mesmos campos (menos o que o banco preenche sozinho)
+  Object.values(SCHEMAS).forEach(sc => { sc.create = sc.fields; });
+
+  // Apagar um pai apaga as habilidades dele (o banco faz isso; aqui só limpamos a cópia local)
+  const CASCADE = {
+    blasphemies: ['blasphemy_abilities', 'blasphemy_id'],
+    agendas: ['agenda_abilities', 'agenda_id'],
+    sin_mark_locations: ['sin_marks', 'location_id'],
+  };
+  const pad = (n) => String(n).padStart(2, '0');
+  const keyOf = (table, row) => SCHEMAS[table].pk.map(c => row[c]).join('-');
 
   // ------------------------------------------------------------------
   // Campos, cartões e formulários de criação
@@ -334,7 +328,7 @@
       if (!Object.keys(values).length) { setStatus(status, 'Sem alterações.'); return; }
       setStatus(status, 'Salvando...');
       try {
-        const n = await rpc('dev_update', { p_table: table, p_key: String(row[schema.pk]), p_values: values });
+        const n = await rpc('dev_update', { p_table: table, p_key: keyOf(table, row), p_values: values });
         if (!n) throw new Error('Nenhuma linha foi alterada.');
         Object.assign(row, values);
         setStatus(status, 'Salvo ✓');
@@ -348,11 +342,16 @@
     if (schema.deletable) {
       const del = el('button', 'dev-delete', 'Excluir');
       del.addEventListener('click', async () => {
-        if (!confirm(`Excluir "${title}"? Isso não dá pra desfazer.`)) return;
+        const extra = CASCADE[table] ? ' e TODAS as habilidades dele' : '';
+        if (!confirm(`Excluir "${title}"${extra}? Isso não dá pra desfazer.`)) return;
         setStatus(status, 'Excluindo...');
         try {
-          await rpc('dev_delete', { p_table: table, p_key: String(row[schema.pk]) });
+          await rpc('dev_delete', { p_table: table, p_key: keyOf(table, row) });
           data[table] = data[table].filter(r => r !== row);
+          if (CASCADE[table]) {
+            const [childTable, childCol] = CASCADE[table];
+            data[childTable] = data[childTable].filter(r => r[childCol] !== row.id);
+          }
           card.remove();
           if (onDeleted) onDeleted();
         } catch (e) {
@@ -389,12 +388,11 @@
         if (f.required && (v === '' || v === null)) { setStatus(status, `Preencha: ${f.label}`, true); return; }
         if (f.type === 'checkbox' || (v !== null && v !== '')) values[f.key] = v;
       }
-      if (table === 'sin_marks' && !values.name) values.name = `${values.location} ${values.mark_level}`;
       setStatus(status, 'Criando...');
       try {
         const row = await rpc('dev_insert', { p_table: table, p_values: values });
         data[table].push(row);
-        onCreated();
+        onCreated(row);
       } catch (e) {
         setStatus(status, e.message, true);
       }
@@ -421,7 +419,7 @@
   }
 
   const byName = (a, b) => String(a.name).localeCompare(String(b.name), 'pt-BR');
-  const state = { blasphemy: '', agenda: '', lojaCategory: '', lojaSearch: '' };
+  const state = { blasphemy: 0, agenda: 0, lojaCategory: '', lojaSearch: '' };
 
   // ------------------------------------------------------------------
   // Abas
@@ -429,51 +427,59 @@
   function renderBlasphemies() {
     const root = $('panel-blasfemias');
     root.innerHTML = '';
-    const list = data.blasphemies.slice().sort(byName);
-    if (!list.length) { root.appendChild(el('div', 'empty', 'Nenhuma blasfêmia.')); return; }
-    if (!list.some(b => b.name === state.blasphemy)) state.blasphemy = list[0].name;
+    const list = data.blasphemies.slice().sort((a, b) => a.id - b.id);
 
     const bar = el('div', 'toolbar');
-    bar.appendChild(buildSelect('Blasfêmia', list.map(b => [b.name, b.name]), state.blasphemy, (v) => {
-      state.blasphemy = v;
-      renderBlasphemies();
-    }));
+    if (list.length) {
+      if (!list.some(b => b.id === state.blasphemy)) state.blasphemy = list[0].id;
+      bar.appendChild(buildSelect('Blasfêmia', list.map(b => [String(b.id), `${pad(b.id)} · ${b.name}`]), String(state.blasphemy), (v) => {
+        state.blasphemy = Number(v);
+        renderBlasphemies();
+      }));
+    }
     root.appendChild(bar);
+    root.appendChild(buildCreateForm('blasphemies', {}, (row) => { state.blasphemy = row.id; renderBlasphemies(); }, '+ Nova blasfêmia'));
+    if (!list.length) { root.appendChild(el('div', 'empty', 'Nenhuma blasfêmia.')); return; }
 
-    const b = list.find(x => x.name === state.blasphemy);
-    root.appendChild(buildCard('blasphemies', b, b.name, 'O nome não pode ser alterado aqui. Pra trocar a imagem: suba o arquivo no Storage (bucket blasphemy-images) e cole a URL pública.'));
+    const b = list.find(x => x.id === state.blasphemy);
+    root.appendChild(buildCard('blasphemies', b, `${pad(b.id)} · ${b.name}`,
+      'Pra trocar a imagem: suba o arquivo no Storage (bucket blasphemy-images) e cole a URL pública.', renderBlasphemies));
 
     root.appendChild(el('h3', null, 'Habilidades'));
     data.blasphemy_abilities
-      .filter(a => a.blasphemy === b.name)
-      .sort((x, y) => (Number(y.is_passive) - Number(x.is_passive)) || (x.id - y.id))
-      .forEach(a => root.appendChild(buildCard('blasphemy_abilities', a, a.name + (a.is_passive ? ' · passiva' : ''), null)));
-    root.appendChild(buildCreateForm('blasphemy_abilities', { blasphemy: b.name }, renderBlasphemies, '+ Nova habilidade'));
+      .filter(a => a.blasphemy_id === b.id)
+      .sort((x, y) => x.number - y.number)
+      .forEach(a => root.appendChild(buildCard('blasphemy_abilities', a,
+        `${pad(a.blasphemy_id)}-${pad(a.number)} · ${a.name}` + (a.is_passive ? ' · passiva' : ''), null)));
+    root.appendChild(buildCreateForm('blasphemy_abilities', { blasphemy_id: b.id }, renderBlasphemies, '+ Nova habilidade'));
   }
 
   function renderAgendas() {
     const root = $('panel-agendas');
     root.innerHTML = '';
-    const list = data.agendas.slice().sort(byName);
-    if (!list.length) { root.appendChild(el('div', 'empty', 'Nenhuma agenda.')); return; }
-    if (!list.some(a => a.name === state.agenda)) state.agenda = list[0].name;
+    const list = data.agendas.slice().sort((a, b) => a.id - b.id);
 
     const bar = el('div', 'toolbar');
-    bar.appendChild(buildSelect('Agenda', list.map(a => [a.name, a.name]), state.agenda, (v) => {
-      state.agenda = v;
-      renderAgendas();
-    }));
+    if (list.length) {
+      if (!list.some(a => a.id === state.agenda)) state.agenda = list[0].id;
+      bar.appendChild(buildSelect('Agenda', list.map(a => [String(a.id), `${pad(a.id)} · ${a.name}`]), String(state.agenda), (v) => {
+        state.agenda = Number(v);
+        renderAgendas();
+      }));
+    }
     root.appendChild(bar);
+    root.appendChild(buildCreateForm('agendas', {}, (row) => { state.agenda = row.id; renderAgendas(); }, '+ Nova agenda'));
+    if (!list.length) { root.appendChild(el('div', 'empty', 'Nenhuma agenda.')); return; }
 
-    const a = list.find(x => x.name === state.agenda);
-    root.appendChild(buildCard('agendas', a, a.name, 'O nome não pode ser alterado aqui.'));
+    const a = list.find(x => x.id === state.agenda);
+    root.appendChild(buildCard('agendas', a, `${pad(a.id)} · ${a.name}`, null, renderAgendas));
 
     root.appendChild(el('h3', null, 'Habilidades'));
     data.agenda_abilities
-      .filter(x => x.agenda === a.name)
-      .sort((x, y) => x.id - y.id)
-      .forEach(x => root.appendChild(buildCard('agenda_abilities', x, x.name, null)));
-    root.appendChild(buildCreateForm('agenda_abilities', { agenda: a.name }, renderAgendas, '+ Nova habilidade'));
+      .filter(x => x.agenda_id === a.id)
+      .sort((x, y) => x.number - y.number)
+      .forEach(x => root.appendChild(buildCard('agenda_abilities', x, `${pad(x.agenda_id)}-${pad(x.number)} · ${x.name}`, null)));
+    root.appendChild(buildCreateForm('agenda_abilities', { agenda_id: a.id }, renderAgendas, '+ Nova habilidade'));
   }
 
   function renderLoja() {
@@ -516,17 +522,17 @@
   function renderSinMarks() {
     const root = $('panel-sinmarks');
     root.innerHTML = '';
-    const locations = data.sin_mark_locations.map(l => l.name).sort();
-    SCHEMAS.sin_marks.create.find(f => f.key === 'location').options = locations;
+    root.appendChild(buildCreateForm('sin_mark_locations', {}, renderSinMarks, '+ Nova localização'));
 
-    locations.forEach(loc => {
-      root.appendChild(el('h3', null, loc));
+    data.sin_mark_locations.slice().sort((a, b) => a.id - b.id).forEach(loc => {
+      root.appendChild(el('h3', null, `${pad(loc.id)} · ${loc.name}`));
+      root.appendChild(buildCard('sin_mark_locations', loc, loc.name, null, renderSinMarks));
       data.sin_marks
-        .filter(m => m.location === loc)
-        .sort((a, b) => (a.mark_level - b.mark_level) || (a.id - b.id))
-        .forEach(m => root.appendChild(buildCard('sin_marks', m, m.name, null)));
+        .filter(m => m.location_id === loc.id)
+        .sort((a, b) => a.number - b.number)
+        .forEach(m => root.appendChild(buildCard('sin_marks', m, `${pad(m.location_id)}-${pad(m.number)} · ${m.name}`, null)));
+      root.appendChild(buildCreateForm('sin_marks', { location_id: loc.id }, renderSinMarks, `+ Novo Sin Mark em ${loc.name}`));
     });
-    root.appendChild(buildCreateForm('sin_marks', {}, renderSinMarks, '+ Novo Sin Mark'));
   }
 
   const RENDERERS = { blasfemias: renderBlasphemies, agendas: renderAgendas, loja: renderLoja, sinmarks: renderSinMarks };
