@@ -2117,17 +2117,22 @@
     'Occult / Medical': 'cat-occult',
   };
 
-  function alreadyOwnsSingle(name) {
-    return inventoryItems.some(i => i.title === name);
+  // Compara pelo ID do item da loja; itens antigos (sem ID) caem no título
+  function isSameItem(inv, storeItem) {
+    return inv.itemId != null ? inv.itemId === storeItem.id : inv.title === storeItem.name;
   }
 
-  function ownedQuantity(name) {
-    const found = inventoryItems.find(i => i.title === name);
+  function alreadyOwnsSingle(storeItem) {
+    return inventoryItems.some(i => isSameItem(i, storeItem));
+  }
+
+  function ownedQuantity(storeItem) {
+    const found = inventoryItems.find(i => isSameItem(i, storeItem));
     return found ? (found.quantity ?? 0) : 0;
   }
 
   function buyStoreItem(item) {
-    if (item.purchase_type === 'single' && alreadyOwnsSingle(item.name)) {
+    if (item.purchase_type === 'single' && alreadyOwnsSingle(item)) {
       return; // o botão já devia estar desabilitado
     }
 
@@ -2142,12 +2147,13 @@
     renderScriptsOverlay();
 
     if (item.purchase_type === 'consumable') {
-      const existing = inventoryItems.find(i => i.title === item.name);
+      const existing = inventoryItems.find(i => isSameItem(i, item));
       if (existing) {
         existing.quantity = (existing.quantity ?? 0) + 1;
       } else {
         inventoryItems.push({
           id: itemIdCounter++,
+          itemId: item.id,
           title: item.name,
           kp: item.kp || 0,
           cat: item.cat_requirement || 0,
@@ -2158,6 +2164,7 @@
     } else {
       inventoryItems.push({
         id: itemIdCounter++,
+        itemId: item.id,
         title: item.name,
         kp: item.kp || 0,
         cat: item.cat_requirement || 0,
@@ -2208,12 +2215,12 @@
         const owned = document.createElement('div');
         owned.className = 'store-card-meta';
         owned.style.marginTop = '-8px';
-        owned.textContent = `Você possui: ${ownedQuantity(item.name)}`;
+        owned.textContent = `Você possui: ${ownedQuantity(item)}`;
         card.appendChild(owned);
       }
 
       const buyBtn = document.createElement('button');
-      const isOwnedSingle = item.purchase_type === 'single' && alreadyOwnsSingle(item.name);
+      const isOwnedSingle = item.purchase_type === 'single' && alreadyOwnsSingle(item);
       buyBtn.textContent = isOwnedSingle ? 'Comprado' : 'Comprar';
       buyBtn.disabled = isOwnedSingle;
       buyBtn.addEventListener('click', () => buyStoreItem(item));
@@ -2255,14 +2262,14 @@
   let indexBlasphemyData = null;
   let indexAgendaData = null;
 
-  function groupAbilitiesByCategory(rows, groupKey, colorMap) {
-    const groups = {};
+  // parents: [{id, name, color_hex?}] já ordenados; rows: habilidades com o ID do pai
+  function groupAbilitiesByCategory(rows, groupKey, parents) {
+    const byId = new Map(parents.map(p => [p.id, { name: p.name, color: p.color_hex || null, abilities: [] }]));
     rows.forEach(r => {
-      const g = r[groupKey];
-      if (!groups[g]) groups[g] = { name: g, color: (colorMap && colorMap[g]) || null, abilities: [] };
-      groups[g].abilities.push({ name: r.name, ability: r.ability });
+      const g = byId.get(r[groupKey]);
+      if (g) g.abilities.push({ name: r.name, ability: r.ability });
     });
-    return Object.values(groups);
+    return [...byId.values()].filter(g => g.abilities.length);
   }
 
   function renderIndexGroups(containerId, groups, query) {
@@ -2337,25 +2344,24 @@
     const [
       { data: blasphemies, error: bErr },
       { data: bAbilities, error: baErr },
+      { data: agendas, error: aErr },
       { data: aAbilities, error: aaErr },
     ] = await Promise.all([
-      sb.from('blasphemies').select('name, color_hex'),
-      sb.from('blasphemy_abilities').select('blasphemy, name, ability').order('blasphemy').order('name'),
-      sb.from('agenda_abilities').select('agenda, name, ability').order('agenda').order('name'),
+      sb.from('blasphemies').select('id, name, color_hex').order('id'),
+      sb.from('blasphemy_abilities').select('blasphemy_id, number, name, ability').order('blasphemy_id').order('number'),
+      sb.from('agendas').select('id, name').order('id'),
+      sb.from('agenda_abilities').select('agenda_id, number, name, ability').order('agenda_id').order('number'),
     ]);
 
-    const err = bErr || baErr || aaErr;
+    const err = bErr || baErr || aErr || aaErr;
     if (err) {
       document.getElementById('indice-status').textContent = 'Erro ao carregar índice: ' + err.message;
       document.getElementById('indice-status').classList.add('error');
       return;
     }
 
-    const colorMap = {};
-    blasphemies.forEach(b => { colorMap[b.name] = b.color_hex; });
-
-    indexBlasphemyData = groupAbilitiesByCategory(bAbilities, 'blasphemy', colorMap);
-    indexAgendaData = groupAbilitiesByCategory(aAbilities, 'agenda', null);
+    indexBlasphemyData = groupAbilitiesByCategory(bAbilities, 'blasphemy_id', blasphemies);
+    indexAgendaData = groupAbilitiesByCategory(aAbilities, 'agenda_id', agendas);
 
     document.getElementById('indice-status').textContent = '';
     document.getElementById('indice-status').classList.remove('error');
@@ -2820,16 +2826,20 @@
   // do nome. Só precisa mudar o que é selecionado/filtrado aqui dentro.
   // ------------------------------------------------------------------
   function createRowPicker(opts) {
-    let groupCache = null;                 // [{name, ...extraFields}]
-    const abilityCache = {};               // { groupName: [{name, ability}] }
+    let groupCache = null;                 // [{id, name, ...campos extras}]
+    const abilityCache = {};               // { idDoPai: [{number, name, ability}] }
     let idCounter = 0;
     let rows = [{ id: idCounter++, group: '', ability: '' }];
     const statusEl = document.getElementById(opts.statusElId);
 
+    // As escolhas guardam IDs: group = ID do pai, ability = número da habilidade
+    // dentro do pai. Vazio = ''. (Valores que não são número viram vazio.)
+    const toNum = (v) => (v !== '' && v != null && Number.isFinite(Number(v))) ? Number(v) : '';
+
     async function loadGroups() {
       if (groupCache || !configured) { render(); return; }
       statusEl.textContent = 'Carregando...';
-      const cols = ['name', ...(opts.groupExtraSelect || [])].join(', ');
+      const cols = ['id', 'name', ...(opts.groupExtraSelect || [])].join(', ');
       const { data, error } = await sb.from(opts.groupTable).select(cols).order('name');
       if (error) {
         statusEl.textContent = 'Erro ao carregar: ' + error.message;
@@ -2842,20 +2852,20 @@
       if (opts.onChange) opts.onChange(rows, groupCache);
     }
 
-    async function loadAbilities(groupName) {
-      if (abilityCache[groupName]) return abilityCache[groupName];
+    async function loadAbilities(groupId) {
+      if (abilityCache[groupId]) return abilityCache[groupId];
       let query = sb
         .from(opts.abilityTable)
-        .select('name, ability')
-        .eq(opts.abilityGroupCol, groupName)
-        .order('name');
+        .select('number, name, ability')
+        .eq(opts.abilityGroupCol, groupId)
+        .order('number');
       if (opts.excludePassives) query = query.eq('is_passive', false);
       const { data, error } = await query;
       if (error) {
         statusEl.textContent = 'Erro ao carregar habilidades: ' + error.message;
         return [];
       }
-      abilityCache[groupName] = data;
+      abilityCache[groupId] = data;
       return data;
     }
 
@@ -2877,15 +2887,18 @@
     }
 
     // Restaura linhas salvas: garante que os grupos/habilidades usados já
-    // estejam carregados no cache antes de desenhar, senão o nome não
-    // aparece (só o value cru do <option>).
+    // estejam carregados no cache antes de desenhar.
     async function setRows(savedRows) {
       if (!groupCache) await loadGroups();
-      const usedGroups = [...new Set((savedRows || []).map(r => r.group).filter(Boolean))];
+      const clean = (savedRows || []).map(r => {
+        const group = toNum(r.group);
+        return { group, ability: group === '' ? '' : toNum(r.ability) };
+      });
+      const usedGroups = [...new Set(clean.map(r => r.group).filter(Boolean))];
       await Promise.all(usedGroups.map(g => loadAbilities(g)));
 
-      rows = (savedRows && savedRows.length)
-        ? savedRows.map(r => ({ id: idCounter++, group: r.group || '', ability: r.ability || '' }))
+      rows = clean.length
+        ? clean.map(r => ({ id: idCounter++, group: r.group, ability: r.ability }))
         : [{ id: idCounter++, group: '', ability: '' }];
 
       normalize();
@@ -2901,7 +2914,7 @@
       rows.forEach(row => {
         if (opts.showGroupHeader && row.group && !headeredGroups.has(row.group) && groupCache) {
           headeredGroups.add(row.group);
-          const g = groupCache.find(g => g.name === row.group);
+          const g = groupCache.find(g => g.id === row.group);
           if (g) {
             const header = document.createElement('div');
             header.className = 'blasphemy-header';
@@ -2909,11 +2922,11 @@
               header.style.borderLeftColor = g[opts.groupColorField];
             }
             header.innerHTML = `
-              ${g.image_url ? `<img src="${g.image_url}" alt="${g.name}">` : ''}
+              ${g.image_url ? `<img src="${escapeHtml(g.image_url)}" alt="${escapeHtml(g.name)}">` : ''}
               <div class="blasphemy-header-text">
-                <div class="blasphemy-header-name">${g.name}</div>
-                ${g.passive_name ? `<div class="blasphemy-passive-label">Passiva · ${g.passive_name}</div>` : ''}
-                ${g.passive_description ? `<div class="blasphemy-passive-desc">${g.passive_description}</div>` : ''}
+                <div class="blasphemy-header-name">${escapeHtml(g.name)}</div>
+                ${g.passive_name ? `<div class="blasphemy-passive-label">Passiva · ${escapeHtml(g.passive_name)}</div>` : ''}
+                ${g.passive_description ? `<div class="blasphemy-passive-desc">${escapeHtml(g.passive_description)}</div>` : ''}
               </div>
             `;
             container.appendChild(header);
@@ -2924,7 +2937,7 @@
         entry.className = 'ability-entry';
 
         if (opts.groupColorField && row.group && groupCache) {
-          const g = groupCache.find(g => g.name === row.group);
+          const g = groupCache.find(g => g.id === row.group);
           if (g && g[opts.groupColorField]) {
             entry.style.borderLeft = `4px solid ${g[opts.groupColorField]}`;
             entry.style.paddingLeft = '12px';
@@ -2937,10 +2950,10 @@
         const groupSelect = document.createElement('select');
         groupSelect.innerHTML = `<option value="">${opts.groupPlaceholder}</option>` +
           (groupCache || []).map(g =>
-            `<option value="${g.name}" ${g.name === row.group ? 'selected' : ''}>${g.name}</option>`
+            `<option value="${g.id}" ${g.id === row.group ? 'selected' : ''}>${escapeHtml(g.name)}</option>`
           ).join('');
         groupSelect.addEventListener('change', async (e) => {
-          row.group = e.target.value;
+          row.group = toNum(e.target.value);
           row.ability = '';
           if (row.group) await loadAbilities(row.group);
           normalize();
@@ -2953,10 +2966,10 @@
         abilitySelect.disabled = !row.group;
         abilitySelect.innerHTML = '<option value="">' + (row.group ? 'Habilidade…' : 'Escolha primeiro') + '</option>' +
           abilityOptions.map(a =>
-            `<option value="${a.name}" ${a.name === row.ability ? 'selected' : ''}>${a.name}</option>`
+            `<option value="${a.number}" ${a.number === row.ability ? 'selected' : ''}>${escapeHtml(a.name)}</option>`
           ).join('');
         abilitySelect.addEventListener('change', (e) => {
-          row.ability = e.target.value;
+          row.ability = toNum(e.target.value);
           normalize();
           render();
           if (opts.onChange) opts.onChange(rows, groupCache);
@@ -2980,11 +2993,11 @@
         entry.appendChild(rowEl);
 
         if (row.group && row.ability) {
-          const detail = (abilityCache[row.group] || []).find(a => a.name === row.ability);
+          const detail = (abilityCache[row.group] || []).find(a => a.number === row.ability);
           if (detail) {
             const detailEl = document.createElement('div');
             detailEl.className = 'ability-detail';
-            detailEl.innerHTML = `<div class="ability-detail-name">${detail.name}</div>${detail.ability}`;
+            detailEl.innerHTML = `<div class="ability-detail-name">${escapeHtml(detail.name)}</div>${escapeHtml(detail.ability)}`;
             entry.appendChild(detailEl);
           }
         }
@@ -3004,7 +3017,7 @@
     groupColorField: 'color_hex',
     groupPlaceholder: 'Blasfêmia…',
     abilityTable: 'blasphemy_abilities',
-    abilityGroupCol: 'blasphemy',
+    abilityGroupCol: 'blasphemy_id',
     excludePassives: true,
     showGroupHeader: true,
   });
@@ -3016,7 +3029,7 @@
     groupExtraSelect: ['normal_item', 'bolded_item'],
     groupPlaceholder: 'Agenda…',
     abilityTable: 'agenda_abilities',
-    abilityGroupCol: 'agenda',
+    abilityGroupCol: 'agenda_id',
     onChange: renderAgendaSummary,
   });
 
@@ -3026,7 +3039,7 @@
     groupTable: 'sin_mark_locations',
     groupPlaceholder: 'Localização…',
     abilityTable: 'sin_marks',
-    abilityGroupCol: 'location',
+    abilityGroupCol: 'location_id',
     autoGrow: false,
   });
 
@@ -3036,32 +3049,33 @@
     const el = document.getElementById('agenda-summary');
     if (!groupCache) return;
 
-    const primaryName = rows[0] ? rows[0].group : '';
-    const secondaryNames = [...new Set(rows.slice(1).map(r => r.group).filter(Boolean))];
-    const primary = groupCache.find(g => g.name === primaryName);
+    const primaryId = rows[0] ? rows[0].group : '';
+    const secondaryIds = [...new Set(rows.slice(1).map(r => r.group).filter(Boolean))];
+    const primary = groupCache.find(g => g.id === primaryId);
 
     let html = '';
     if (primary) {
       html += `
         <div class="agenda-summary-block">
-          <div class="agenda-summary-label">Agenda principal · ${primary.name}</div>
+          <div class="agenda-summary-label">Agenda principal · ${escapeHtml(primary.name)}</div>
           <ul class="agenda-summary-items">
-            <li>${primary.normal_item || '—'}</li>
-            <li><strong>${primary.bolded_item || '—'}</strong></li>
+            <li>${escapeHtml(primary.normal_item) || '—'}</li>
+            <li><strong>${escapeHtml(primary.bolded_item) || '—'}</strong></li>
           </ul>
         </div>`;
     } else {
       html += `<div class="empty-state">Escolha a agenda principal na aba Agendas.</div>`;
     }
 
-    if (secondaryNames.length) {
+    if (secondaryIds.length) {
       html += `
         <div class="agenda-summary-block">
           <div class="agenda-summary-label">Agendas secundárias</div>
           <ul class="agenda-summary-items">
-            ${secondaryNames.map(n => {
-              const g = groupCache.find(x => x.name === n);
-              return `<li><strong>${g ? g.bolded_item || '—' : '—'}</strong> <span class="agenda-summary-tag">(${n})</span></li>`;
+            ${secondaryIds.map(id => {
+              const g = groupCache.find(x => x.id === id);
+              if (!g) return '';
+              return `<li><strong>${escapeHtml(g.bolded_item) || '—'}</strong> <span class="agenda-summary-tag">(${escapeHtml(g.name)})</span></li>`;
             }).join('')}
           </ul>
         </div>`;
@@ -3255,7 +3269,7 @@
         scripts: inventory.scripts,
         kpMax: inventory.kpMax,
         kp: inventory.kp,
-        items: inventoryItems.map(i => ({ title: i.title, kp: i.kp, cat: i.cat, description: i.description, quantity: i.quantity ?? 1 })),
+        items: inventoryItems.map(i => ({ itemId: i.itemId ?? null, title: i.title, kp: i.kp, cat: i.cat, description: i.description, quantity: i.quantity ?? 1 })),
       },
     };
   }
@@ -3370,7 +3384,7 @@
     inventoryItems.length = 0;
     itemIdCounter = 0;
     (sd.inventory?.items || []).forEach(i => {
-      inventoryItems.push({ id: itemIdCounter++, title: i.title, kp: i.kp, cat: i.cat, description: i.description || '', quantity: i.quantity ?? 1 });
+      inventoryItems.push({ id: itemIdCounter++, itemId: i.itemId ?? null, title: i.title, kp: i.kp, cat: i.cat, description: i.description || '', quantity: i.quantity ?? 1 });
     });
     renderItems();
     renderInventoryResources();
@@ -3494,7 +3508,7 @@
             inventoryItems.length = 0;
             itemIdCounter = 0;
             (value || []).forEach(i => inventoryItems.push({
-              id: itemIdCounter++, title: i.title, kp: i.kp, cat: i.cat,
+              id: itemIdCounter++, itemId: i.itemId ?? null, title: i.title, kp: i.kp, cat: i.cat,
               description: i.description || '', quantity: i.quantity ?? 1,
             }));
             touched.add('items');
